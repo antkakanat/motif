@@ -17,7 +17,8 @@ export function isFreeUser(): boolean {
 
 // ── License key format validation (Phase 1 stub) ──
 
-const KEY_REGEX = /^MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+// Matches either MOTIF-XXXX-XXXX-XXXX or standard UUID format (Lemon Squeezy default)
+const KEY_REGEX = /^(MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})$/;
 
 export function validateKeyFormat(key: string): boolean {
   return KEY_REGEX.test(key.toUpperCase().trim());

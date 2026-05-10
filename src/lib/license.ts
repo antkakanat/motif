@@ -34,7 +34,7 @@ export async function activate(key: string): Promise<ActivationResult> {
   const normalized = key.toUpperCase().trim();
 
   if (!validateKeyFormat(normalized)) {
-    return { success: false, error: 'Invalid license key format. Expected: MOTIF-XXXX-XXXX-XXXX' };
+    return { success: false, error: 'Invalid license key format. Please check your key and try again.' };
   }
 
   try {

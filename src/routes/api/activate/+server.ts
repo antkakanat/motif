@@ -6,7 +6,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 
-const KEY_REGEX = /^MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+const KEY_REGEX = /^(MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})$/;
 
 export const POST: RequestHandler = async ({ request }) => {
   let body: { licenseKey?: string; deviceId?: string };
@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
   if (!KEY_REGEX.test(normalized)) {
     return json({
       success: false,
-      error: 'Invalid license key format. Expected: MOTIF-XXXX-XXXX-XXXX'
+      error: 'Invalid license key format. Please check your key.'
     }, { status: 422 });
   }
 
