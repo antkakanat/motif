@@ -1,0 +1,196 @@
+{
+  "app": {
+    "name": "Motif",
+    "tagline": "Capture every note.",
+    "subTagline": "No cloud. No subscription. No noise. Just your links, quotes, notes, and images — private, offline, and always yours."
+  },
+  "nav": {
+    "allCaptures": "All Captures",
+    "links": "Links",
+    "quotes": "Quotes",
+    "notes": "Notes",
+    "images": "Images",
+    "trash": "Trash",
+    "settings": "Settings",
+    "collections": "Collections"
+  },
+  "capture": {
+    "addNew": "New Capture",
+    "addLink": "Add Link",
+    "addQuote": "Add Quote",
+    "addNote": "Add Note",
+    "addImage": "Add Image",
+    "titlePlaceholder": "Give it a title...",
+    "urlPlaceholder": "Paste a URL...",
+    "quotePlaceholder": "Paste or type a quote...",
+    "notePlaceholder": "Start writing...",
+    "sourcePlaceholder": "Source URL (optional)",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "archive": "Archive",
+    "restore": "Restore",
+    "deletePermanently": "Delete Permanently",
+    "duplicateWarning": "This URL has already been saved.",
+    "duplicateAction": "Save Anyway",
+    "noTitle": "Untitled",
+    "read": "Read"
+  },
+  "status": {
+    "unread": "Unread",
+    "saved": "Saved",
+    "archived": "Archived"
+  },
+  "tags": {
+    "addTag": "Add tag...",
+    "noTags": "No tags yet"
+  },
+  "collections": {
+    "title": "Collections",
+    "add": "New Collection",
+    "namePlaceholder": "Collection name...",
+    "delete": "Delete Collection",
+    "deleteConfirm": "Are you sure you want to delete this collection? Captures inside will not be deleted.",
+    "rename": "Rename Collection",
+    "empty": "This collection is empty",
+    "addToCollection": "Add to collection",
+    "none": "None"
+  },
+  "search": {
+    "placeholder": "Search captures...",
+    "noResults": "No captures found",
+    "resultsCount": "{{count}} result(s) found"
+  },
+  "filter": {
+    "allTypes": "All Types",
+    "allStatuses": "All Statuses",
+    "dateRange": "Date Range",
+    "clearFilters": "Clear Filters"
+  },
+  "trash": {
+    "title": "Trash",
+    "empty": "Trash is empty",
+    "autoPurge": "Items deleted more than 30 days ago are removed automatically.",
+    "restoreAll": "Restore All",
+    "emptyTrash": "Empty Trash",
+    "confirmEmpty": "Permanently delete all items in trash?"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "appearance": "Appearance",
+    "security": "Security",
+    "storage": "Storage",
+    "data": "Data",
+    "changelog": "Changelog",
+    "privacy": "Privacy",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "pinLock": "App Lock (PIN)",
+    "pinSet": "Set PIN",
+    "pinChange": "Change PIN",
+    "pinRemove": "Remove PIN",
+    "pinEnter": "Enter your PIN",
+    "pinNew": "Enter new PIN",
+    "pinConfirm": "Confirm PIN",
+    "pinMismatch": "PINs don't match",
+    "pinWrong": "Wrong PIN",
+    "autoLock": "Auto-lock",
+    "autoLockNever": "Never",
+    "autoLock1": "After 1 minute",
+    "autoLock5": "After 5 minutes",
+    "autoLock15": "After 15 minutes",
+    "autoLock60": "After 1 hour",
+    "storageUsed": "Storage used",
+    "storageAvailable": "Available",
+    "backupReminder": "You haven't backed up in over 30 days.",
+    "backupNow": "Export Backup",
+    "exportData": "Export Backup",
+    "importData": "Import Backup",
+    "dangerZone": "Danger Zone",
+    "clearData": "Clear All Data",
+    "clearDataWarning": "This will permanently delete all your captures, tags, and settings. This action cannot be undone.",
+    "clearDataConfirm": "Type DELETE MY DATA to confirm",
+    "clearDataButton": "Delete Everything",
+    "privacyStatement": "We collect zero data. Everything stays on your device.",
+    "privacyLink": "Privacy Policy",
+    "termsLink": "Terms of Use",
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "version": "Version"
+  },
+  "pro": {
+    "title": "Motif Pro",
+    "gate": {
+      "title": "{{feature}} is a Pro feature",
+      "body": "Unlock it once, keep it forever. No subscription. No renewal. Just Motif.",
+      "cta": "Get Lifetime Pro — $29"
+    },
+    "activated": "Pro activated. Welcome.",
+    "settings": {
+      "status": {
+        "free": "Motif Free",
+        "pro": "Motif Pro ✓"
+      },
+      "activate": {
+        "label": "Enter license key",
+        "cta": "Activate",
+        "success": "License activated on this device."
+      },
+      "deactivate": {
+        "cta": "Deactivate this device"
+      },
+      "buy": {
+        "cta": "Get Lifetime Pro →"
+      }
+    },
+    "fetchingClean": "Fetching clean version..."
+  },
+  "lock": {
+    "title": "Motif is Locked",
+    "subtitle": "Enter your PIN to continue",
+    "forgot": "Forgot PIN?",
+    "forgotHint": "Clear app data to reset your PIN. You can re-import from a backup."
+  },
+  "onboarding": {
+    "welcome": "Welcome to Motif!",
+    "welcomeDesc": "Your private, offline-first capture tool.",
+    "step1": "Capture anything — links, quotes, notes, images.",
+    "step2": "Search instantly with fuzzy full-text search.",
+    "step3": "Tag and organize with flat tags.",
+    "step4": "Everything stays on your device. Always.",
+    "getStarted": "Get Started",
+    "skip": "Skip Tour"
+  },
+  "empty": {
+    "allCaptures": "Nothing captured yet",
+    "allCapturesHint": "Click the + button to save your first link, quote, note, or image.",
+    "links": "No links saved",
+    "quotes": "No quotes saved",
+    "notes": "No notes saved",
+    "images": "No images saved",
+    "linksHint": "Save URLs from any website.",
+    "quotesHint": "Save memorable quotes and passages.",
+    "notesHint": "Write quick notes in rich text.",
+    "imagesHint": "Save screenshots and images from your device."
+  },
+  "shortcuts": {
+    "newCapture": "New Capture",
+    "search": "Search",
+    "closeModal": "Close",
+    "showShortcuts": "Show Shortcuts"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "openOriginal": "Open Original",
+    "retry": "Try Again",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done"
+  }
+}

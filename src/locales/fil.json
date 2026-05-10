@@ -1,0 +1,165 @@
+﻿{
+  "app": {
+    "name": "",
+    "tagline": "",
+    "subTagline": ""
+  },
+  "nav": {
+    "allCaptures": "",
+    "links": "",
+    "quotes": "",
+    "notes": "",
+    "images": "",
+    "trash": "",
+    "settings": ""
+  },
+  "capture": {
+    "addNew": "",
+    "addLink": "",
+    "addQuote": "",
+    "addNote": "",
+    "addImage": "",
+    "titlePlaceholder": "",
+    "urlPlaceholder": "",
+    "quotePlaceholder": "",
+    "notePlaceholder": "",
+    "sourcePlaceholder": "",
+    "save": "",
+    "cancel": "",
+    "edit": "",
+    "delete": "",
+    "archive": "",
+    "restore": "",
+    "deletePermanently": "",
+    "duplicateWarning": "",
+    "duplicateAction": "",
+    "noTitle": ""
+  },
+  "status": {
+    "unread": "",
+    "saved": "",
+    "archived": ""
+  },
+  "tags": {
+    "addTag": "",
+    "noTags": ""
+  },
+  "search": {
+    "placeholder": "",
+    "noResults": "",
+    "resultsCount": ""
+  },
+  "filter": {
+    "allTypes": "",
+    "allStatuses": "",
+    "dateRange": "",
+    "clearFilters": ""
+  },
+  "trash": {
+    "title": "",
+    "empty": "",
+    "autoPurge": "",
+    "restoreAll": "",
+    "emptyTrash": "",
+    "confirmEmpty": ""
+  },
+  "settings": {
+    "title": "",
+    "account": "",
+    "appearance": "",
+    "security": "",
+    "storage": "",
+    "data": "",
+    "changelog": "",
+    "privacy": "",
+    "theme": "",
+    "themeLight": "",
+    "themeDark": "",
+    "themeSystem": "",
+    "pinLock": "",
+    "pinSet": "",
+    "pinChange": "",
+    "pinRemove": "",
+    "pinEnter": "",
+    "pinNew": "",
+    "pinConfirm": "",
+    "pinMismatch": "",
+    "pinWrong": "",
+    "autoLock": "",
+    "autoLockNever": "",
+    "autoLock1": "",
+    "autoLock5": "",
+    "autoLock15": "",
+    "autoLock60": "",
+    "storageUsed": "",
+    "storageAvailable": "",
+    "backupReminder": "",
+    "backupNow": "",
+    "clearData": "",
+    "clearDataWarning": "",
+    "clearDataConfirm": "",
+    "clearDataButton": "",
+    "privacyStatement": "",
+    "privacyLink": "",
+    "termsLink": "",
+    "keyboardShortcuts": "",
+    "version": ""
+  },
+  "pro": {
+    "title": "",
+    "upgrade": "",
+    "price": "",
+    "trialActive": "",
+    "trialExpired": "",
+    "featureLocked": "",
+    "activateKey": "",
+    "keyPlaceholder": "",
+    "keyInvalid": "",
+    "activated": "",
+    "deactivate": ""
+  },
+  "lock": {
+    "title": "",
+    "subtitle": "",
+    "forgot": "",
+    "forgotHint": ""
+  },
+  "onboarding": {
+    "welcome": "",
+    "welcomeDesc": "",
+    "step1": "",
+    "step2": "",
+    "step3": "",
+    "step4": "",
+    "getStarted": "",
+    "skip": ""
+  },
+  "empty": {
+    "allCaptures": "",
+    "allCapturesHint": "",
+    "links": "",
+    "quotes": "",
+    "notes": "",
+    "images": "",
+    "linksHint": "",
+    "quotesHint": "",
+    "notesHint": "",
+    "imagesHint": ""
+  },
+  "shortcuts": {
+    "newCapture": "",
+    "search": "",
+    "closeModal": "",
+    "showShortcuts": ""
+  },
+  "common": {
+    "loading": "",
+    "error": "",
+    "retry": "",
+    "confirm": "",
+    "close": "",
+    "back": "",
+    "next": "",
+    "done": ""
+  }
+}
