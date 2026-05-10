@@ -19,43 +19,64 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     // 2. Fetch with Timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s max
+    let html: string;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s max
 
-    const response = await fetch(targetUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Motif-Reader/1.0; +https://byant.dev/motif)'
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'
+        }
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        return json({ error: 'fetch_failed', message: `Target site returned status ${response.status}` }, { status: 502 });
       }
-    });
 
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      return json({ error: 'fetch_failed', status: response.status }, { status: 502 });
+      html = await response.text();
+      if (!html || html.trim().length === 0) {
+        return json({ error: 'empty_response', message: 'The target page returned no content' }, { status: 422 });
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return json({ error: 'timeout', message: 'The request timed out after 8 seconds' }, { status: 504 });
+      }
+      return json({ error: 'fetch_error', message: `Failed to fetch the page: ${err.message}` }, { status: 502 });
     }
 
-    const html = await response.text();
-
-    // 3. Parse with Linkedom (Lighter than JSDOM)
-    const { document } = parseHTML(html);
-
-    // 4. Run Readability
-    const reader = new Readability(document);
-    const article = reader.parse();
-
-    if (!article) {
-      return json({ error: 'parse_failed', message: 'Could not extract content from this page' }, { status: 422 });
+    // 3. Parse with Linkedom
+    let article: any;
+    try {
+      const { document } = parseHTML(html);
+      const reader = new Readability(document);
+      article = reader.parse();
+    } catch (err: any) {
+      return json({ error: 'parse_error', message: `Failed to parse page content: ${err.message}` }, { status: 422 });
     }
 
-    // 5. Sanitize Output
-    const sanitizedContent = DOMPurify.sanitize(article.content, {
-      ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'b', 'i', 'strong', 'em', 'a', 'img', 'hr', 'br'],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title']
-    });
+    if (!article || !article.content) {
+      return json({ error: 'no_content', message: 'Could not extract readable content from this page' }, { status: 422 });
+    }
+
+    // 4. Sanitize Output
+    let sanitizedContent: string;
+    try {
+      sanitizedContent = DOMPurify.sanitize(article.content, {
+        ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'b', 'i', 'strong', 'em', 'a', 'img', 'hr', 'br'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title']
+      });
+    } catch (err: any) {
+      // If sanitizer fails, fall back to a safer but less clean version or return error
+      return json({ error: 'sanitization_error', message: `Failed to sanitize content: ${err.message}` }, { status: 500 });
+    }
 
     return json({
-      title: article.title,
+      title: article.title || 'Untitled',
       byline: article.byline,
       excerpt: article.excerpt,
       siteName: article.siteName,
@@ -64,11 +85,8 @@ export const GET: RequestHandler = async ({ url }) => {
     });
 
   } catch (err: any) {
-    if (err.name === 'AbortError') {
-      return json({ error: 'timeout', message: 'The request timed out' }, { status: 504 });
-    }
-    console.error('Reading View Proxy Error:', err);
-    return json({ error: 'internal_error', message: err.message }, { status: 500 });
+    console.error('Reading View Global Error:', err);
+    return json({ error: 'internal_error', message: `Global proxy error: ${err.message}` }, { status: 500 });
   }
 };
 
