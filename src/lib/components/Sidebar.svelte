@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { collections, addCollection } from '$lib/stores/collections';
   import { isProUnlocked } from '$lib/pro';
+  import { resolvedTheme } from '$lib/theme';
   import { tick } from 'svelte';
 
   interface NavItem {
@@ -71,7 +72,7 @@
   <!-- Logo -->
   <div class="sidebar-header">
     <div class="logo">
-      <span class="logo-icon">♪</span>
+      <img src={$resolvedTheme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Motif Logo" class="logo-img" />
       {#if !collapsed}
         <span class="logo-text">Motif</span>
       {/if}
@@ -188,16 +189,10 @@
     gap: 10px;
   }
 
-  .logo-icon {
-    font-size: 1.5rem;
-    color: var(--color-primary);
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-primary-subtle);
-    border-radius: var(--radius-md);
+  .logo-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
   }
 
   .logo-text {

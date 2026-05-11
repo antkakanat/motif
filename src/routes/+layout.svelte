@@ -9,6 +9,7 @@
   import { loadCollections } from '$lib/stores/collections';
   import { loadSettings, settings } from '$lib/stores/settings';
   import { registerShortcuts, handleKeydown } from '$lib/shortcuts';
+  import { resolvedTheme } from '$lib/theme';
   import { onMount } from 'svelte';
   import '$lib/theme';
   import { goto } from '$app/navigation';
@@ -95,7 +96,9 @@
   {/if}
 {:else}
   <div class="app-loading">
-    <div class="loading-logo">♪</div>
+    <div class="loading-logo">
+      <img src={$resolvedTheme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Motif Logo" class="loading-logo-img" />
+    </div>
     <p class="loading-text">Motif</p>
   </div>
 {/if}
@@ -137,8 +140,6 @@
   }
 
   .loading-logo {
-    font-size: 48px;
-    color: var(--color-primary);
     width: 72px;
     height: 72px;
     display: flex;
@@ -147,6 +148,12 @@
     background: var(--color-primary-subtle);
     border-radius: var(--radius-xl);
     animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .loading-logo-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
   }
 
   @keyframes pulse {

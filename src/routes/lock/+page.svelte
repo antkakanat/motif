@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { settings, hashPin, clearPin, setPin } from '$lib/stores/settings';
+  import { resolvedTheme } from '$lib/theme';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
@@ -116,7 +117,7 @@
 <div class="lock-screen">
   <!-- Logo -->
   <div class="lock-logo">
-    <span class="lock-logo-icon">♪</span>
+    <img src={$resolvedTheme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Motif Logo" class="lock-logo-img" />
   </div>
 
   <!-- Title -->
@@ -206,9 +207,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 36px;
-    color: var(--color-primary);
     margin-bottom: 24px;
+  }
+
+  .lock-logo-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
   }
 
   .lock-title {
