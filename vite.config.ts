@@ -9,7 +9,7 @@ export default defineConfig({
     sveltekit(),
     SvelteKitPWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-512.png'],
+      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'logo-light.png', 'logo-dark.png'],
       manifest: {
         name: 'Motif — Capture every note.',
         short_name: 'Motif',
@@ -21,7 +21,13 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: 'icons/icon-512.png',
+            src: 'icons/android-chrome-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: 'icons/android-chrome-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'

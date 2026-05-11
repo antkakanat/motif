@@ -57,12 +57,17 @@ export class MotifDB extends Dexie {
   constructor() {
     super('motif');
 
-    // Schema v1 — never delete or reorder indexes after shipping
+    // Schema v1
     this.version(1).stores({
       captures: 'id, type, status, *tags, collectionId, isTrashed, createdAt, updatedAt',
       collections: 'id, name, createdAt',
       tags: 'id, name',
       settings: 'key'
+    });
+
+    // Schema v2 — added sourceUrl index for duplicate detection
+    this.version(2).stores({
+      captures: 'id, type, status, *tags, collectionId, isTrashed, createdAt, updatedAt, sourceUrl',
     });
   }
 }

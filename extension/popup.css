@@ -1,0 +1,118 @@
+/* ── Motif Extension Popup ── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 280px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0F0E1A;
+  color: #E8E6F0;
+}
+
+.popup {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Header ── */
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(91, 78, 214, 0.15);
+  border-radius: 10px;
+  font-size: 20px;
+  color: #5B4ED6;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #E8E6F0;
+}
+
+/* ── Body ── */
+
+.popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.btn-primary {
+  background: #5B4ED6;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #4F42C0;
+  box-shadow: 0 2px 8px rgba(91, 78, 214, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primary.saved {
+  background: #22C55E;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #9895AD;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #E8E6F0;
+}
+
+.btn-icon {
+  font-size: 14px;
+}
+
+/* ── Footer ── */
+
+.popup-footer {
+  font-size: 11px;
+  color: #5A5770;
+  text-align: center;
+  letter-spacing: 0.02em;
+}

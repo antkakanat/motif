@@ -43,12 +43,19 @@
     try {
       const res = await fetch(`/api/read?url=${encodeURIComponent(capture.content)}`);
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to fetch clean version');
+        let errMessage = 'Failed to fetch clean version';
+        try {
+          const data = await res.json();
+          errMessage = data.message || errMessage;
+        } catch (e) {
+          errMessage = await res.text();
+        }
+        throw new Error(errMessage);
       }
       content = await res.json();
     } catch (err: any) {
       error = err.message;
+      console.error("Read View Error:", err);
     } finally {
       loading = false;
     }

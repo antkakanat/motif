@@ -3,6 +3,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import BackupReminderBanner from '$lib/components/BackupReminderBanner.svelte';
+  import Toast from '$lib/components/Toast.svelte';
   import { initI18n } from '$lib/i18n';
   import { loadCaptures, purgeOldTrash } from '$lib/stores/captures';
   import { loadCollections } from '$lib/stores/collections';
@@ -64,6 +65,10 @@
   <title>Motif — Capture every note.</title>
   <meta name="description" content="No cloud. No subscription. No noise. Just your links, quotes, notes, and images — private, offline, and always yours." />
   <meta name="theme-color" content="#5B4ED6" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 </svelte:head>
 
 <!-- Track user activity to reset idle timer -->
@@ -94,6 +99,8 @@
     <p class="loading-text">Motif</p>
   </div>
 {/if}
+
+<Toast />
 
 <style>
   .app-shell {

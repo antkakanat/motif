@@ -165,9 +165,18 @@ export async function purgeOldTrash(): Promise<number> {
 
 export async function findDuplicateUrl(url: string): Promise<Capture | undefined> {
   const normalized = normalizeUrl(url);
-  const all = get(captures);
-  return all.find(
-    (c) => c.type === 'link' && !c.isTrashed && normalizeUrl(c.content) === normalized
+  
+  // Only deduplicate links. Quotes, notes, and images allow duplicates.
+  // We check both content (where links store their URL) and sourceUrl.
+  const all = await db.captures
+    .where('type')
+    .equals('link')
+    .filter(c => !c.isTrashed)
+    .toArray();
+
+  return all.find(c => 
+    normalizeUrl(c.content) === normalized || 
+    (c.sourceUrl && normalizeUrl(c.sourceUrl) === normalized)
   );
 }
 

@@ -4,7 +4,16 @@ import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import DOMPurify from 'isomorphic-dompurify';
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async (event) => {
+  try {
+    return await handleGet(event);
+  } catch (err: any) {
+    console.error('Reading View FATAL Error:', err);
+    return json({ error: 'internal_error', message: `Fatal proxy error: ${err?.message || String(err)}` }, { status: 500 });
+  }
+};
+
+const handleGet: RequestHandler = async ({ url }) => {
   const targetUrl = url.searchParams.get('url');
 
   if (!targetUrl) {
@@ -86,7 +95,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
   } catch (err: any) {
     console.error('Reading View Global Error:', err);
-    return json({ error: 'internal_error', message: `Global proxy error: ${err.message}` }, { status: 500 });
+    return json({ error: 'internal_error', message: `Global proxy error: ${err?.message || String(err)}` }, { status: 500 });
   }
 };
 

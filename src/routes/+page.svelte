@@ -10,6 +10,7 @@
   import { registerShortcuts } from '$lib/shortcuts';
   import { startOnboarding } from '$lib/onboarding';
   import { settings } from '$lib/stores/settings';
+  import { showToast } from '$lib/stores/toast';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -37,7 +38,17 @@
       void startOnboarding();
     }
 
-    // Handle Share Target API params
+    // ── Handle Browser Extension params (auto-save, no modal) ──
+    const extType = $page.url.searchParams.get('ext_type');
+    if (extType) {
+      const extUrl = $page.url.searchParams.get('ext_url') || '';
+      const extTitle = $page.url.searchParams.get('ext_title') || '';
+      const extText = $page.url.searchParams.get('ext_text') || '';
+      void handleExtensionCapture(extType, extUrl, extTitle, extText);
+      return; // skip Share Target handling
+    }
+
+    // ── Handle Share Target API params (show modal) ──
     const shareUrl = $page.url.searchParams.get('url');
     const shareTitle = $page.url.searchParams.get('title');
     const shareText = $page.url.searchParams.get('text');
@@ -53,6 +64,31 @@
       void goto('/', { replaceState: true });
     }
   });
+
+  // ── Extension capture auto-save ──
+  async function handleExtensionCapture(type: string, url: string, title: string, text: string) {
+    try {
+      const captureType: CaptureType = type === 'quote' ? 'quote' : 'link';
+
+      // Title priority for extension captures:
+      // 1. Page title from extension (ext_title)
+      // 2. URL as fallback
+      await addCapture({
+        type: captureType,
+        title: title || url || 'Untitled',
+        content: captureType === 'quote' ? text : url,
+        sourceUrl: captureType === 'quote' ? url : undefined,
+      });
+
+      showToast(captureType === 'quote' ? '✓ Quote saved from extension' : '✓ Link saved from extension');
+    } catch (err) {
+      console.error('Extension capture failed:', err);
+      showToast('Failed to save capture');
+    }
+
+    // Clear extension params from URL
+    void goto('/', { replaceState: true });
+  }
 
   function handleSearch() {
     if (searchQuery.trim()) {

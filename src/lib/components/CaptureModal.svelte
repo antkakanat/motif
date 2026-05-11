@@ -91,6 +91,10 @@
   function handleSave() {
     if (!content.trim() && activeTab !== 'note') return;
 
+    // Title priority for link captures:
+    // 1. User-entered title (always preserve if provided)
+    // 2. OG title fetched from URL (Phase 2 — when proxy is built)
+    // 3. URL itself as fallback (current Phase 1 behavior)
     onSave({
       type: activeTab,
       title: title.trim() || (activeTab === 'link' ? content.trim() : t('capture.noTitle')),
@@ -168,7 +172,12 @@
           <button
             class="modal-tab"
             class:active={activeTab === tab.key}
-            onclick={() => { activeTab = tab.key; reset(); }}
+            onclick={() => { 
+              if (activeTab !== tab.key) {
+                activeTab = tab.key; 
+                reset(); 
+              }
+            }}
           >
             <span class="tab-icon">{tab.icon}</span>
             <span class="tab-label">{tab.label}</span>
