@@ -28,16 +28,10 @@ body {
   gap: 10px;
 }
 
-.logo {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(91, 78, 214, 0.15);
-  border-radius: 10px;
-  font-size: 20px;
-  color: #5B4ED6;
+.logo-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .title {
