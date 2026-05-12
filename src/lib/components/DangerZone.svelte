@@ -19,8 +19,9 @@
 
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={() => open = false}>
-    <div class="danger-modal scale-in" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-backdrop" onclick={() => open = false} role="presentation">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="danger-modal scale-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
       <div class="danger-header">
         <span class="danger-icon">⚠️</span>
         <h2>{t('settings.clearData')}</h2>

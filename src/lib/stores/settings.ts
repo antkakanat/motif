@@ -54,9 +54,11 @@ export async function loadSettings(): Promise<void> {
       case KEYS.PIN_HASH:
         state.pinHash = row.value;
         break;
-      case KEYS.AUTO_LOCK_MINUTES:
-        state.autoLockMinutes = parseInt(row.value, 10) || 5;
+      case KEYS.AUTO_LOCK_MINUTES: {
+        const mins = parseInt(row.value, 10);
+        state.autoLockMinutes = isNaN(mins) ? 0 : mins;
         break;
+      }
       case KEYS.LAST_BACKUP_AT:
         state.lastBackupAt = row.value;
         break;

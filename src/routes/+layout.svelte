@@ -14,6 +14,7 @@
   import '$lib/theme';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { pwaInfo } from 'virtual:pwa-info';
 
   let { children } = $props();
   let ready = $state(false);
@@ -37,12 +38,33 @@
     resetIdleTimer();
   }
 
+  $effect(() => {
+    // Re-run whenever settings change or app is ready
+    if (ready) {
+      resetIdleTimer();
+    }
+  });
+
   onMount(async () => {
     await initI18n();
     await loadSettings();
     await loadCaptures();
     await loadCollections();
     await purgeOldTrash();
+    // ── PWA Registration ──
+    if (pwaInfo) {
+      const { registerSW } = await import('virtual:pwa-register');
+      registerSW({
+        immediate: true,
+        onRegistered(r) {
+          console.log('Motif Service Worker Registered');
+        },
+        onRegisterError(error) {
+          console.error('Service Worker Registration Error:', error);
+        }
+      });
+    }
+
     ready = true;
 
     // Redirect to lock if PIN is set and we're not already on the lock route
@@ -51,9 +73,6 @@
     if (hasPIN && !isLock) {
       await goto(`/lock?redirect=${encodeURIComponent($page.url.pathname)}`);
     }
-
-    // Start idle timer after initial load
-    resetIdleTimer();
   });
 
   function onKeydown(e: KeyboardEvent) {

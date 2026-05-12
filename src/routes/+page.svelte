@@ -72,10 +72,20 @@
 
       // Title priority for extension captures:
       // 1. Page title from extension (ext_title)
-      // 2. URL as fallback
+      // 2. Hostname from URL
+      // 3. "Untitled"
+      let displayTitle = title;
+      if (!displayTitle && url) {
+        try {
+          displayTitle = new URL(url).hostname.replace('www.', '');
+        } catch {
+          displayTitle = url;
+        }
+      }
+
       await addCapture({
         type: captureType,
-        title: title || url || 'Untitled',
+        title: displayTitle || 'Untitled',
         content: captureType === 'quote' ? text : url,
         sourceUrl: captureType === 'quote' ? url : undefined,
       });

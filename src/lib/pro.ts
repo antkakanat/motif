@@ -3,9 +3,15 @@
 // ────────────────────────────────────────────────
 
 import { get } from 'svelte/store';
+import { pwaInfo } from 'virtual:pwa-info';
 import { settings } from '$lib/stores/settings';
 
+import { browser } from '$app/environment';
+
 export function isProUnlocked(): boolean {
+  if (browser && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    return true;
+  }
   const state = get(settings);
   return state.proActive;
 }

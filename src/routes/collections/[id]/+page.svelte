@@ -80,7 +80,7 @@
             maxlength="30"
           />
         {:else}
-          <h1 class="page-title" onclick={startEditing} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && startEditing()} aria-label="Edit collection name">
+          <h1 class="page-title">
             {collection.name}
           </h1>
         {/if}

@@ -3,6 +3,8 @@
   import type { Capture } from '$lib/db';
   import { selectedIds, isSelectionActive, toggleSelection, rangeSelect } from '$lib/stores/selection';
   import { onMount } from 'svelte';
+  import { collections } from '$lib/stores/collections';
+  import { updateCapture } from '$lib/stores/captures';
 
   let {
     capture, onDelete, onArchive, onRestore, onEdit, visibleIds
@@ -16,6 +18,7 @@
   } = $props();
 
   let showMenu = $state(false);
+  let showCollectionPicker = $state(false);
   let isSelected = $derived($selectedIds.has(capture.id));
 
   let longPressTimer: any;
@@ -51,7 +54,15 @@
     return p.join(' ');
   }
 
-  function closeMenu() { showMenu = false; }
+  function closeMenu() {
+    showMenu = false;
+    showCollectionPicker = false;
+  }
+
+  async function moveToCollection(colId: string | null) {
+    await updateCapture(capture.id, { collectionId: colId });
+    closeMenu();
+  }
 
   function handleCardClick(e: MouseEvent) {
     if (e.shiftKey && visibleIds) {
@@ -131,6 +142,22 @@
       {#if !capture.isTrashed}
         {#if onEdit}<button class="mi" onclick={() => { onEdit(capture); closeMenu(); }}>✏️ {t('capture.edit')}</button>{/if}
         {#if onArchive}<button class="mi" onclick={() => { onArchive(capture.id); closeMenu(); }}>📦 {t('capture.archive')}</button>{/if}
+        
+        <button class="mi" onclick={(e) => { e.stopPropagation(); showCollectionPicker = !showCollectionPicker; }}>
+          📂 {t('nav.collections')}
+        </button>
+        {#if showCollectionPicker}
+          <div class="sub-menu">
+            {#each $collections as col}
+              <button class="mi sub" onclick={() => moveToCollection(col.id)}>
+                <span class="dot" style="background: {col.color}"></span>
+                {col.name}
+              </button>
+            {/each}
+            <button class="mi sub italic" onclick={() => moveToCollection(null)}>{t('collections.none')}</button>
+          </div>
+        {/if}
+
         {#if onDelete}<button class="mi danger" onclick={() => { onDelete(capture.id); closeMenu(); }}>🗑 {t('capture.delete')}</button>{/if}
       {:else}
         {#if onRestore}<button class="mi" onclick={() => { onRestore(capture.id); closeMenu(); }}>↩️ {t('capture.restore')}</button>{/if}
@@ -223,5 +250,24 @@
   .mi { display:flex; align-items:center; gap:10px; width:100%; padding:8px 12px; background:none; border:none; cursor:pointer; font-size:13px; color:var(--color-text); border-radius:var(--radius-sm); transition:background var(--duration-fast); font-family:var(--font-sans); text-align:left; }
   .mi:hover { background:var(--color-surface); }
   .mi.danger { color:var(--color-danger); }
-  .mi.danger:hover { background:var(--color-danger-subtle); }
+  .mi.danger:hover { background: #fff1f2; color: var(--color-danger); }
+
+  .sub-menu {
+    border-top: 1px solid var(--color-border);
+    margin-top: 4px;
+    padding-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .mi.sub {
+    font-size: 12px;
+    padding: 6px 12px 6px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .italic { font-style: italic; opacity: 0.7; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
 </style>

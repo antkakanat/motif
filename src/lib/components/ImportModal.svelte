@@ -77,7 +77,7 @@
 
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={handleBackdropClick} transition:fade={{ duration: 150 }}>
+  <div class="modal-backdrop" onclick={handleBackdropClick} transition:fade={{ duration: 150 }} role="presentation">
     <div class="modal scale-in" role="dialog" aria-modal="true" aria-label="Import Backup">
       <div class="modal-header">
         <h2 class="modal-title">Import Backup</h2>

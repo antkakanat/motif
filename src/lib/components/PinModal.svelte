@@ -73,8 +73,8 @@
 
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={handleBackdropClick}>
-    <div class="modal scale-in" role="dialog" aria-modal="true" aria-label={t('settings.pinLock')}>
+  <div class="modal-backdrop" onclick={handleBackdropClick} transition:fade={{ duration: 150 }} role="presentation">
+    <div class="modal scale-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t('settings.pinLock')}>
       <div class="modal-header">
         <h2 class="modal-title">{t('settings.pinLock')}</h2>
         <button class="btn-close" onclick={close}>×</button>

@@ -100,6 +100,7 @@
     "pinWrong": "Wrong PIN",
     "autoLock": "Auto-lock",
     "autoLockNever": "Never",
+    "autoLockHint": "Hides app after inactivity",
     "autoLock1": "After 1 minute",
     "autoLock5": "After 5 minutes",
     "autoLock15": "After 15 minutes",
