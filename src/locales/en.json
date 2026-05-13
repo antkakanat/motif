@@ -116,7 +116,7 @@
     "clearDataWarning": "This will permanently delete all your captures, tags, and settings. This action cannot be undone.",
     "clearDataConfirm": "Type DELETE MY DATA to confirm",
     "clearDataButton": "Delete Everything",
-    "privacyStatement": "We collect zero data. Everything stays on your device.",
+    "privacyStatement": "🛡 We collect zero data. Everything stays on your device.",
     "privacyLink": "Privacy Policy",
     "termsLink": "Terms of Use",
     "keyboardShortcuts": "Keyboard Shortcuts",

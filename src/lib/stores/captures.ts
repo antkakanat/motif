@@ -14,8 +14,16 @@ export const isLoading = writable(true);
 
 // ── Derived stores for filtered views ──
 
-export const activeCaptures = derived(captures, ($captures) =>
+export const nonTrashedCaptures = derived(captures, ($captures) =>
   $captures.filter((c) => !c.isTrashed).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+);
+
+export const activeCaptures = derived(nonTrashedCaptures, ($captures) =>
+  $captures.filter((c) => c.status !== 'archived')
+);
+
+export const archivedCaptures = derived(nonTrashedCaptures, ($captures) =>
+  $captures.filter((c) => c.status === 'archived')
 );
 
 export const trashedCaptures = derived(captures, ($captures) =>
@@ -27,7 +35,7 @@ export function capturesByType(type: CaptureType) {
 }
 
 export function capturesByStatus(status: CaptureStatus) {
-  return derived(activeCaptures, ($active) => $active.filter((c) => c.status === status));
+  return derived(nonTrashedCaptures, ($active) => $active.filter((c) => c.status === status));
 }
 
 export function capturesByTag(tag: string) {

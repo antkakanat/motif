@@ -3,13 +3,13 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import BackupReminderBanner from '$lib/components/BackupReminderBanner.svelte';
+  import InstallPromptBanner from '$lib/components/InstallPromptBanner.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import { initI18n } from '$lib/i18n';
   import { loadCaptures, purgeOldTrash } from '$lib/stores/captures';
   import { loadCollections } from '$lib/stores/collections';
   import { loadSettings, settings } from '$lib/stores/settings';
   import { registerShortcuts, handleKeydown } from '$lib/shortcuts';
-  import { resolvedTheme } from '$lib/theme';
   import { onMount } from 'svelte';
   import '$lib/theme';
   import { goto } from '$app/navigation';
@@ -19,7 +19,7 @@
   let { children } = $props();
   let ready = $state(false);
 
-  // ── Auto-lock idle timer ──
+  // Auto-lock idle timer
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   function resetIdleTimer() {
@@ -51,15 +51,16 @@
     await loadCaptures();
     await loadCollections();
     await purgeOldTrash();
-    // ── PWA Registration ──
+    // Register PWA/service worker on supported browsers.
     if (pwaInfo) {
       const { registerSW } = await import('virtual:pwa-register');
       registerSW({
         immediate: true,
-        onRegistered(r) {
+        onRegistered(registration: ServiceWorkerRegistration | undefined) {
+          void registration;
           console.log('Motif Service Worker Registered');
         },
-        onRegisterError(error) {
+        onRegisterError(error: unknown) {
           console.error('Service Worker Registration Error:', error);
         }
       });
@@ -82,8 +83,8 @@
 </script>
 
 <svelte:head>
-  <title>Motif — Capture every note.</title>
-  <meta name="description" content="No cloud. No subscription. No noise. Just your links, quotes, notes, and images — private, offline, and always yours." />
+  <title>Motif - Capture every note.</title>
+  <meta name="description" content="No cloud. No subscription. No noise. Just your links, quotes, notes, and images - private, offline, and always yours." />
   <meta name="theme-color" content="#5B4ED6" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -100,23 +101,24 @@
 />
 
 {#if ready}
-  <!-- Lock screen gets its own full-page layout — no sidebar/nav -->
+  <!-- Lock screen gets its own full-page layout - no sidebar/nav -->
   {#if $page.url.pathname === '/lock'}
     {@render children()}
   {:else}
     <div class="app-shell">
       <Sidebar />
       <main class="main-content">
+        <InstallPromptBanner />
         <BackupReminderBanner />
         {@render children()}
       </main>
       <BottomNav />
     </div>
   {/if}
-{:else}
+  {:else}
   <div class="app-loading">
     <div class="loading-logo">
-      <img src={$resolvedTheme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Motif Logo" class="loading-logo-img" />
+      <img src="/logo-light.png" alt="Motif Logo" class="loading-logo-img" />
     </div>
     <p class="loading-text">Motif</p>
   </div>

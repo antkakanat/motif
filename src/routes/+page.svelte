@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { activeCaptures, addCapture, softDeleteCapture, updateCapture, type CreateCaptureInput } from '$lib/stores/captures';
+  import { nonTrashedCaptures, addCapture, softDeleteCapture, updateCapture, type CreateCaptureInput } from '$lib/stores/captures';
   import { search, type SearchResult } from '$lib/search';
   import { clearSelection, selectAll } from '$lib/stores/selection';
   import CaptureCard from '$lib/components/CaptureCard.svelte';
@@ -18,9 +18,37 @@
   let showModal = $state(false);
   let searchQuery = $state('');
   let filterType = $state<CaptureType | 'all'>('all');
-  let filterStatus = $state<CaptureStatus | 'all'>('all');
+  let filterStatus = $state<CaptureStatus | 'all' | 'active'>('active');
   let searchResults = $state<SearchResult[]>([]);
   let initialModalData = $state<any>(null);
+  let lastHandledParamSignature = $state('');
+
+  function handleRouteParams() {
+    const statusParam = $page.url.searchParams.get('status');
+    const openNewCapture = $page.url.searchParams.get('new') === '1';
+    const focusSearch = $page.url.searchParams.get('focus') === 'search';
+    const signature = `${statusParam ?? ''}|${openNewCapture}|${focusSearch}`;
+    if (signature === lastHandledParamSignature) return;
+    lastHandledParamSignature = signature;
+
+    if (statusParam === 'archived' || statusParam === 'saved' || statusParam === 'unread' || statusParam === 'all' || statusParam === 'active') {
+      filterStatus = statusParam;
+    }
+
+    if (openNewCapture) {
+      showModal = true;
+    }
+
+    if (focusSearch) {
+      requestAnimationFrame(() => {
+        document.getElementById('search-input')?.focus();
+      });
+    }
+
+    if (statusParam || openNewCapture || focusSearch) {
+      void goto('/', { replaceState: true });
+    }
+  }
 
   // Register shortcuts + start onboarding for new users
   onMount(() => {
@@ -62,7 +90,15 @@
       showModal = true;
       // Clear URL params
       void goto('/', { replaceState: true });
+      return;
     }
+
+    handleRouteParams();
+  });
+
+  $effect(() => {
+    $page.url.search;
+    handleRouteParams();
   });
 
   // ── Extension capture auto-save ──
@@ -110,7 +146,7 @@
 
   // Compute displayed captures
   let displayedCaptures = $derived.by(() => {
-    let items = $activeCaptures;
+    let items = $nonTrashedCaptures;
 
     // Apply search filter (empty result set must not fall through to full list)
     if (searchQuery.trim()) {
@@ -132,8 +168,13 @@
       items = items.filter(c => c.type === filterType);
     }
 
-    // Apply status filter
-    if (filterStatus !== 'all') {
+    // Default "active" view behaves like an inbox: archived is hidden unless explicitly requested.
+    if (filterStatus === 'active') {
+      items = items.filter(c => c.status !== 'archived');
+    } else if (filterStatus === 'all') {
+      // Intentionally include archived in "all" to match the filter label semantics.
+      items = items;
+    } else {
       items = items.filter(c => c.status === filterStatus);
     }
 
@@ -159,8 +200,11 @@
   <!-- Header -->
   <div class="page-header">
     <div class="header-left">
-      <h1 class="page-title">{t('nav.allCaptures')}</h1>
-      <span class="capture-count">{displayedCaptures.length}</span>
+      <div class="title-row">
+        <h1 class="page-title">{t('nav.allCaptures')}</h1>
+        <span class="capture-count">{displayedCaptures.length}</span>
+      </div>
+      <span class="privacy-badge">Private by default</span>
     </div>
     <button id="btn-new-capture" class="btn-new" onclick={() => showModal = true}
       title={t('shortcuts.newCapture')}>
@@ -194,6 +238,7 @@
         <option value="image">{t('nav.images')}</option>
       </select>
       <select class="filter-select" bind:value={filterStatus}>
+        <option value="active">Active (Unread + Saved)</option>
         <option value="all">{t('filter.allStatuses')}</option>
         <option value="unread">{t('status.unread')}</option>
         <option value="saved">{t('status.saved')}</option>
@@ -232,9 +277,6 @@
   {/if}
 </div>
 
-<!-- FAB (mobile) -->
-<button class="fab" onclick={() => showModal = true} aria-label={t('capture.addNew')}>+</button>
-
 <!-- Modal -->
 <CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
 
@@ -244,9 +286,21 @@
 <style>
   .page { max-width: 100%; }
   .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
-  .header-left { display:flex; align-items:center; gap:10px; }
+  .header-left { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+  .title-row { display:flex; align-items:center; gap:10px; }
   .page-title { font-size:1.75rem; font-weight:700; color:var(--color-text); margin:0; letter-spacing:-0.02em; }
   .capture-count { padding:2px 10px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-full); font-size:0.8125rem; font-weight:600; }
+  .privacy-badge {
+    display:inline-flex;
+    align-items:center;
+    padding:2px 10px;
+    border-radius:var(--radius-full);
+    font-size:0.72rem;
+    font-weight:600;
+    color:var(--color-text-secondary);
+    background:color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+    border:1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
+  }
 
   .btn-new { display:flex; align-items:center; gap:6px; padding:10px 20px; background:var(--color-primary); color:white; border:none; border-radius:var(--radius-md); font-size:0.875rem; font-weight:500; cursor:pointer; transition:all var(--duration-fast) var(--ease-out); font-family:var(--font-sans); }
   .btn-new:hover { background:var(--color-primary-hover); box-shadow:var(--shadow-md); transform:translateY(-1px); }
@@ -278,7 +332,4 @@
   .btn-empty { display:flex; align-items:center; gap:6px; padding:10px 24px; background:var(--color-primary); color:white; border:none; border-radius:var(--radius-md); font-size:0.875rem; font-weight:500; cursor:pointer; transition:all var(--duration-fast) var(--ease-out); font-family:var(--font-sans); }
   .btn-empty:hover { background:var(--color-primary-hover); }
 
-  .fab { display:none; position:fixed; bottom:84px; right:20px; width:56px; height:56px; border-radius:50%; background:var(--color-primary); color:white; border:none; font-size:1.75rem; font-weight:300; cursor:pointer; box-shadow:var(--shadow-lg); z-index:40; transition:all var(--duration-fast) var(--ease-out); }
-  .fab:hover { background:var(--color-primary-hover); transform:scale(1.05); }
-  @media (max-width: 768px) { .fab { display:flex; align-items:center; justify-content:center; } }
 </style>

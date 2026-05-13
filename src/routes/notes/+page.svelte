@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { t } from '$lib/i18n';
   import { capturesByType, addCapture, softDeleteCapture, updateCapture, type CreateCaptureInput } from '$lib/stores/captures';
   import { clearSelection, selectAll } from '$lib/stores/selection';
@@ -9,7 +9,7 @@
   import { onMount } from 'svelte';
 
   const captures = capturesByType('note');
-  let visibleIds = $derived($captures.map(c => c.id));
+  let visibleIds = $derived($captures.map((c) => c.id));
   let showModal = $state(false);
 
   onMount(() => {
@@ -24,7 +24,7 @@
   async function handleArchive(id: string) { await updateCapture(id, { status: 'archived' }); }
 </script>
 
-<svelte:head><title>Notes — Motif</title></svelte:head>
+<svelte:head><title>Notes - Motif</title></svelte:head>
 
 <div class="page fade-in">
   <div class="page-header">
@@ -32,18 +32,13 @@
       <h1 class="page-title">✎ {t('nav.notes')}</h1>
       <span class="count">{$captures.length}</span>
     </div>
-    <button class="btn-new" onclick={() => showModal = true}>+ {t('capture.addNote')}</button>
+    <button class="btn-new" onclick={() => (showModal = true)}>+ {t('capture.addNote')}</button>
   </div>
 
   {#if $captures.length > 0}
     <div class="grid">
       {#each $captures as capture (capture.id)}
-        <CaptureCard 
-          {capture} 
-          onDelete={handleDelete} 
-          onArchive={handleArchive} 
-          {visibleIds}
-        />
+        <CaptureCard {capture} onDelete={handleDelete} onArchive={handleArchive} {visibleIds} />
       {/each}
     </div>
   {:else}
@@ -56,7 +51,6 @@
 </div>
 
 <CaptureModal bind:open={showModal} defaultTab="note" onSave={handleSave} />
-
 <BulkActionBar {visibleIds} />
 
 <style>

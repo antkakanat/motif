@@ -1,121 +1,209 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { t } from '$lib/i18n';
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { collections } from '$lib/stores/collections';
 
-  interface NavItem {
-    href: string;
-    icon: string;
-    label: string;
-  }
+  let moreOpen = $state(false);
 
-  const navItems: NavItem[] = [
-    { href: '/', icon: '⊞', label: t('nav.allCaptures') },
-    { href: '/links', icon: '🔗', label: t('nav.links') },
-    { href: '/quotes', icon: '❝', label: t('nav.quotes') },
-    { href: '/notes', icon: '✎', label: t('nav.notes') },
-    { href: '/images', icon: '◻', label: t('nav.images') },
-    { href: '/trash', icon: '🗑', label: t('nav.trash') },
-    { href: '/settings', icon: '⚙', label: t('nav.settings') }
-  ];
+  $effect(() => {
+    $page.url.pathname;
+    moreOpen = false;
+  });
 
   function isActive(href: string, pathname: string): boolean {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   }
+
+  const moreItems = [
+    { href: '/quotes', icon: '❞', label: t('nav.quotes') },
+    { href: '/notes', icon: '✎', label: t('nav.notes') },
+    { href: '/images', icon: '▣', label: t('nav.images') },
+    { href: '/archived', icon: '⌂', label: t('status.archived') },
+    { href: '/trash', icon: '🗑', label: t('nav.trash') },
+    { href: '/settings', icon: '⚙', label: t('nav.settings') }
+  ];
 </script>
 
-<nav class="bottom-nav" role="navigation" aria-label="Main navigation">
-  {#each navItems as item}
-    <a
-      href={item.href}
-      class="bottom-nav-item"
-      class:active={isActive(item.href, $page.url.pathname)}
-    >
-      <span class="bottom-nav-icon">{item.icon}</span>
-      <span class="bottom-nav-label">{item.label}</span>
-    </a>
-  {/each}
+{#if moreOpen}
+  <button class="sheet-backdrop" aria-label="Close menu" onclick={() => (moreOpen = false)}></button>
+  <div class="more-sheet slide-up">
+    <p class="sheet-title">More</p>
+    <div class="sheet-grid">
+      {#each moreItems as item}
+        <a href={item.href} class="sheet-item" class:active={isActive(item.href, $page.url.pathname)}>
+          <span class="sheet-icon">{item.icon}</span>
+          <span>{item.label}</span>
+        </a>
+      {/each}
+
+      {#if $collections.length > 0}
+        <a href={`/collections/${$collections[0].id}`} class="sheet-item" title={t('nav.collections')}>
+          <span class="sheet-icon">●</span>
+          <span>{t('nav.collections')}</span>
+        </a>
+      {:else}
+        <a href="/settings" class="sheet-item" title={t('nav.collections')}>
+          <span class="sheet-icon">●</span>
+          <span>{t('nav.collections')}</span>
+        </a>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<nav class="bottom-nav" aria-label="Main navigation">
+  <a href="/" class="bottom-item" class:active={isActive('/', $page.url.pathname)}>
+    <span class="bottom-icon">▦</span>
+    <span class="bottom-label">Home</span>
+  </a>
+
+  <a href="/links" class="bottom-item" class:active={isActive('/links', $page.url.pathname)}>
+    <span class="bottom-icon">🔗</span>
+    <span class="bottom-label">{t('nav.links')}</span>
+  </a>
+
+  <button class="capture-fab" aria-label={t('capture.addNew')} onclick={() => goto('/?new=1')}>
+    +
+  </button>
+
+  <a href="/?focus=search" class="bottom-item" class:active={$page.url.pathname === '/' && $page.url.searchParams.get('focus') === 'search'}>
+    <span class="bottom-icon">⌕</span>
+    <span class="bottom-label">Search</span>
+  </a>
+
+  <button class="bottom-item more-toggle" class:active={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+    <span class="bottom-icon">⋯</span>
+    <span class="bottom-label">More</span>
+  </button>
 </nav>
 
 <style>
   .bottom-nav {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: calc(68px + env(safe-area-inset-bottom, 0px));
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    z-index: 50;
-    padding: 0 4px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    display:none;
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    height:calc(72px + env(safe-area-inset-bottom, 0px));
+    background:var(--color-surface);
+    border-top:1px solid var(--color-border);
+    z-index:60;
+    padding:0 8px env(safe-area-inset-bottom, 0px);
+    align-items:flex-start;
+    justify-content:space-between;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
   }
 
   @media (max-width: 768px) {
-    .bottom-nav {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      /* Smooth scrolling hint */
-      mask-image: linear-gradient(to right, black 90%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
-    }
-    .bottom-nav::-webkit-scrollbar {
-      display: none;
-    }
+    .bottom-nav { display:flex; }
   }
 
-  .bottom-nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 4px 12px;
-    text-decoration: none;
-    color: var(--color-text-secondary);
-    font-size: 11px;
-    font-weight: 500;
-    transition: all var(--duration-fast) var(--ease-out);
-    position: relative;
-    min-width: 72px;
-    height: 100%;
-    flex-shrink: 0;
+  .bottom-item {
+    flex:1;
+    height:64px;
+    border:none;
+    background:none;
+    text-decoration:none;
+    color:var(--color-text-secondary);
+    font-family:var(--font-sans);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    font-size:11px;
+    font-weight:600;
+    cursor:pointer;
+    transition:color var(--duration-fast);
   }
 
-  .bottom-nav-item:hover {
-    color: var(--color-text);
+  .bottom-item.active { color:var(--color-primary); }
+  .bottom-icon { font-size:1.1rem; line-height:1; }
+
+  .capture-fab {
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    margin-top:-14px;
+    border:none;
+    background:var(--color-primary);
+    color:#fff;
+    text-decoration:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.9rem;
+    line-height:1;
+    box-shadow:var(--shadow-lg);
+    flex-shrink:0;
   }
 
-  .bottom-nav-item.active {
-    color: var(--color-primary);
+  .capture-fab:active { transform:translateY(1px); }
+
+  .more-toggle {
+    border-radius:var(--radius-sm);
   }
 
-  .bottom-nav-item.active::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 3px;
-    background: var(--color-primary);
-    border-radius: 0 0 var(--radius-full) var(--radius-full);
+  .sheet-backdrop {
+    position:fixed;
+    inset:0;
+    border:none;
+    background:rgba(8, 8, 16, 0.35);
+    z-index:58;
   }
 
-  .bottom-nav-icon {
-    font-size: 24px;
-    line-height: 1;
+  .more-sheet {
+    position:fixed;
+    left:12px;
+    right:12px;
+    bottom:calc(78px + env(safe-area-inset-bottom, 0px));
+    background:var(--color-surface);
+    border:1px solid var(--color-border);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-xl);
+    padding:14px;
+    z-index:59;
   }
 
-  .bottom-nav-label {
-    white-space: nowrap;
-    letter-spacing: -0.01em;
+  .sheet-title {
+    margin:0 0 10px;
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--color-text-secondary);
+    font-weight:700;
   }
+
+  .sheet-grid {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+  }
+
+  .sheet-item {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    min-height:74px;
+    border:1px solid var(--color-border);
+    border-radius:var(--radius-md);
+    text-decoration:none;
+    color:var(--color-text-secondary);
+    font-size:12px;
+    font-weight:600;
+    background:var(--color-bg);
+  }
+
+  .sheet-item.active {
+    border-color:var(--color-primary);
+    color:var(--color-primary);
+    background:var(--color-primary-subtle);
+  }
+
+  .sheet-icon { font-size:1rem; }
 </style>

@@ -8,8 +8,15 @@ export default defineConfig({
     tailwindcss(),
     sveltekit(),
     SvelteKitPWA({
+      kit: {
+        spa: true,
+        adapterFallback: '/'
+      },
+      devOptions: {
+        enabled: true
+      },
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'logo-light.png', 'logo-dark.png'],
+      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'logo-light.png', 'logo-dark.png', 'screenshots/desktop.png', 'screenshots/mobile.png'],
       manifest: {
         name: 'Motif — Capture every note.',
         short_name: 'Motif',
@@ -31,6 +38,19 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
+          }
+        ],
+        screenshots: [
+          {
+            src: 'screenshots/desktop.png',
+            sizes: '1200x630',
+            type: 'image/png',
+            form_factor: 'wide'
+          },
+          {
+            src: 'screenshots/mobile.png',
+            sizes: '1200x630',
+            type: 'image/png'
           }
         ],
         share_target: {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
+  import { fade } from 'svelte/transition';
   import { settings, setPin, clearPin, hashPin } from '$lib/stores/settings';
 
   let {

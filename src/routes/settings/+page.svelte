@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { t } from '$lib/i18n';
   import { CHECKOUT_URLS } from '$lib/constants';
   import { settings, setAutoLockMinutes } from '$lib/stores/settings';
@@ -72,6 +72,8 @@
   }
 
   const shortcuts = getShortcuts();
+  const CHANGELOG_PREVIEW_ITEMS = 3;
+  const changelogPreview = changelog.slice(0, 2);
   const autoLockOptions = [
     { value: 0, label: t('settings.autoLockNever') },
     { value: 1, label: t('settings.autoLock1') },
@@ -81,34 +83,37 @@
   ];
 </script>
 
-<svelte:head><title>Settings — Motif</title></svelte:head>
+<svelte:head><title>Settings - Motif</title></svelte:head>
 
 <div class="page fade-in">
-  <h1 class="page-title">⚙ {t('settings.title')}</h1>
+  <h1 class="page-title">{t('settings.title')}</h1>
 
   <!-- Account / License -->
   <section class="section">
     <h2 class="section-title">{t('settings.account')}</h2>
     <div class="section-card">
       {#if $settings.proActive}
-        <div class="pro-badge">⭐ {t('pro.settings.status.pro')}</div>
+        <div class="pro-badge">{t('pro.settings.status.pro')}</div>
         <p class="section-desc">Licensed to this device.</p>
         <button class="btn-outline danger-outline" onclick={handleDeactivate}>{t('pro.settings.deactivate.cta')}</button>
       {:else}
         <div class="pro-badge free-badge">{t('pro.settings.status.free')}</div>
-        <p class="section-desc" style="margin-bottom: 24px;">
-          <a href={CHECKOUT_URLS.pro} target="_blank" rel="noopener" class="btn btn-primary" style="text-decoration: none;">
-            {t('pro.settings.buy.cta')} — $19
+        <p class="section-desc">
+          <a href={CHECKOUT_URLS.pro} target="_blank" rel="noopener" class="btn btn-primary account-buy-btn">
+            Get Lifetime Pro — $29
           </a>
         </p>
-        
-        <p class="setting-hint" style="margin-bottom: 12px;">
-          Need more seats? 
-          <a href={CHECKOUT_URLS.family} target="_blank" rel="noopener" class="link-muted">Family (5 seats)</a> · 
+        <p class="launch-offer">
+          Launch offer: Use code <strong>ILOVEMOTIF</strong> at checkout<br />
+          to get $10 off. First 100 users only.
+        </p>
+        <p class="setting-hint seats-hint">
+          Need more seats?
+          <a href={CHECKOUT_URLS.family} target="_blank" rel="noopener" class="link-muted">Family (5 seats)</a>
+          ·
           <a href={CHECKOUT_URLS.team} target="_blank" rel="noopener" class="link-muted">Team (10 seats)</a>
         </p>
-        
-        <p class="setting-hint" style="margin-bottom: 8px;">Already purchased?</p>
+        <p class="setting-hint" style="margin-bottom: 8px;">Already purchased? Enter license key</p>
         <div class="license-form">
           <input type="text" class="input" placeholder={t('pro.settings.activate.label')} bind:value={licenseKey} />
           <button class="btn-primary" onclick={handleActivate}>{t('pro.settings.activate.cta')}</button>
@@ -127,7 +132,7 @@
       <div class="theme-switcher">
         {#each (['light', 'dark', 'system'] as ThemeMode[]) as mode}
           <button class="theme-btn" class:active={$themeMode === mode} onclick={() => handleThemeChange(mode)}>
-            {mode === 'light' ? '☀️' : mode === 'dark' ? '🌙' : '💻'}
+            {mode === 'light' ? '☀' : mode === 'dark' ? '◐' : '🖥'}
             {t(`settings.theme${mode.charAt(0).toUpperCase() + mode.slice(1)}`)}
           </button>
         {/each}
@@ -232,10 +237,10 @@
       <div class="setting-row">
         <div class="setting-info">
           <span class="setting-label">{t('settings.dangerZone') || 'Danger Zone'}</span>
-          <p class="setting-hint">Careful—these actions are permanent</p>
+          <p class="setting-hint">Careful - these actions are permanent</p>
         </div>
         <button class="btn-outline danger-outline" onclick={() => showDangerZone = true}>
-          🗑 {t('settings.clearData')}
+          {t('settings.clearData')}
         </button>
       </div>
     </div>
@@ -245,19 +250,25 @@
   <section class="section">
     <h2 class="section-title">{t('settings.changelog')}</h2>
     <div class="section-card">
-      {#each changelog as entry}
+      {#each changelogPreview as entry}
         <div class="changelog-entry">
           <div class="changelog-header">
             <span class="changelog-version">v{entry.version}</span>
             <span class="changelog-date">{entry.date}</span>
           </div>
           <ul class="changelog-list">
-            {#each entry.items as item}
+            {#each entry.items.slice(0, CHANGELOG_PREVIEW_ITEMS) as item}
               <li>{item}</li>
             {/each}
+            {#if entry.items.length > CHANGELOG_PREVIEW_ITEMS}
+              <li class="changelog-more">+{entry.items.length - CHANGELOG_PREVIEW_ITEMS} more in full changelog</li>
+            {/if}
           </ul>
         </div>
       {/each}
+      <a class="changelog-link" href="https://byant.dev/motif/changelog" target="_blank" rel="noopener">
+        Read full changelog
+      </a>
     </div>
   </section>
 
@@ -265,13 +276,13 @@
   <section class="section">
     <h2 class="section-title">{t('settings.privacy')}</h2>
     <div class="section-card">
-      <p class="privacy-statement">🛡 {t('settings.privacyStatement')}</p>
+      <p class="privacy-statement">{t('settings.privacyStatement')}</p>
       <div class="privacy-links">
         <a href="https://byant.dev/motif/privacy" target="_blank" rel="noopener">{t('settings.privacyLink')}</a>
-        <span class="separator">·</span>
+        <span class="separator">|</span>
         <a href="https://byant.dev/motif/terms" target="_blank" rel="noopener">{t('settings.termsLink')}</a>
       </div>
-      <p class="version-info">{t('settings.version')}: 1.0.0</p>
+      <p class="version-info">{t('settings.version')}: 1.1.0</p>
     </div>
   </section>
 </div>
@@ -295,6 +306,9 @@
 
   .pro-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-md); font-size:14px; font-weight:600; margin-bottom:12px; }
   .free-badge { background:var(--color-surface); color:var(--color-text-secondary); border: 1px solid var(--color-border); }
+  .account-buy-btn { text-decoration:none; }
+  .launch-offer { font-size:13px; color:var(--color-text-secondary); line-height:1.5; margin:0 0 12px; }
+  .seats-hint { margin-bottom:8px; }
 
   .license-form { display:flex; gap:8px; }
   @media (max-width: 480px) {
@@ -335,6 +349,9 @@
   .changelog-date { font-size:12px; color:var(--color-text-secondary); }
   .changelog-list { margin:0; padding-left:20px; }
   .changelog-list li { font-size:13px; color:var(--color-text-secondary); line-height:1.8; }
+  .changelog-more { font-weight:600; color:var(--color-primary); }
+  .changelog-link { display:inline-block; margin-top:8px; font-size:13px; color:var(--color-primary); text-decoration:none; }
+  .changelog-link:hover { text-decoration:underline; }
 
   .privacy-statement { font-size:14px; color:var(--color-text); margin:0 0 12px; }
   .privacy-links { display:flex; align-items:center; gap:8px; }
