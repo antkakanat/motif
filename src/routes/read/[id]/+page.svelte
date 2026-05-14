@@ -5,12 +5,14 @@
   import { t } from '$lib/i18n';
   import ProGate from '$lib/components/ProGate.svelte';
   import { browser } from '$app/environment';
+  import { assertProFeature, isFeatureAvailable } from '$lib/pro';
 
   const id = $page.params.id as string;
   let capture = $state<Capture | null>(null);
   let content = $state<any>(null);
   let error = $state<string | null>(null);
   let loading = $state(true);
+  let canUseReadingView = $state(false);
 
   // Typography settings
   let font = $state('sans'); // 'sans' | 'serif'
@@ -18,6 +20,13 @@
   let width = $state('comfortable'); // 'comfortable' (65ch) | 'wide' (85ch)
 
   onMount(async () => {
+    assertProFeature('readingView');
+    canUseReadingView = isFeatureAvailable('readingView');
+    if (!canUseReadingView) {
+      loading = false;
+      return;
+    }
+
     // Load preferences
     if (browser) {
       font = localStorage.getItem('motif_read_font') || 'sans';

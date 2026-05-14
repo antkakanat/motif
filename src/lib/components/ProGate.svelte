@@ -13,16 +13,22 @@
     children: import('svelte').Snippet;
   } = $props();
 
-  // Reactively check Pro status
   let unlocked = $derived(isProUnlocked());
+
+  function getFeatureLabel(): string {
+    const key = `pro.gate.feature.${feature}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return featureLabel || feature;
+  }
 </script>
 
 {#if unlocked}
   {@render children()}
 {:else}
   <div class="pro-gate">
-    <div class="gate-icon">🔒</div>
-    <h3 class="gate-title">{t('pro.gate.title', { feature: featureLabel || feature })}</h3>
+    <div class="gate-icon">PRO</div>
+    <h3 class="gate-title">{t('pro.gate.title', { feature: getFeatureLabel() })}</h3>
     <p class="gate-desc">{t('pro.gate.body')}</p>
     <a href={CHECKOUT_URLS.pro} target="_blank" rel="noopener" class="gate-btn">
       {t('pro.gate.cta')}
@@ -43,7 +49,16 @@
     gap: 8px;
   }
 
-  .gate-icon { font-size: 40px; margin-bottom: 4px; }
+  .gate-icon {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-subtle);
+    margin-bottom: 4px;
+  }
 
   .gate-title {
     font-size: 16px;
@@ -51,8 +66,6 @@
     color: var(--color-text);
     margin: 0;
   }
-
-
 
   .gate-desc {
     font-size: 13px;

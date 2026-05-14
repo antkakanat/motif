@@ -128,7 +128,16 @@
     "gate": {
       "title": "{{feature}} is a Pro feature",
       "body": "Unlock it once, keep it forever. No subscription. No renewal. Just Motif.",
-      "cta": "Get Lifetime Pro — $29"
+      "cta": "Get Lifetime Pro — $29",
+      "feature": {
+        "collections": "Collections",
+        "export": "Export Backup",
+        "import": "Import Backup",
+        "readingView": "Reading View",
+        "ocr": "OCR",
+        "aiSearch": "AI Search",
+        "earlyAccess": "Early Access"
+      }
     },
     "activated": "Pro activated. Welcome.",
     "settings": {

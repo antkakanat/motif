@@ -5,6 +5,7 @@
   import CaptureCard from '$lib/components/CaptureCard.svelte';
   import CaptureModal from '$lib/components/CaptureModal.svelte';
   import { goto } from '$app/navigation';
+  import { requestProFeature } from '$lib/pro';
 
   const archived = capturesByStatus('archived');
   let visibleIds = $derived($archived.map((capture) => capture.id));
@@ -33,8 +34,10 @@
     showModal = true;
   }
 
-  function handleCardOpen(capture: Capture) {
+  async function handleCardOpen(capture: Capture) {
     if (capture.type === 'link') {
+      const allowed = await requestProFeature('readingView', 'Reading View');
+      if (!allowed) return;
       void goto(`/read/${capture.id}`);
       return;
     }

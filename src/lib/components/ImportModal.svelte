@@ -2,6 +2,7 @@
   import { t } from '$lib/i18n';
   import { fade } from 'svelte/transition';
   import { analyzeImport, executeImport, type ImportAnalysis } from '$lib/import';
+  import { requestProFeature } from '$lib/pro';
 
   let { open = $bindable(false), file = $bindable<File | null>(null) } = $props<{
     open: boolean;
@@ -56,6 +57,9 @@
 
   async function handleConfirm() {
     if (!cachedAnalysis) return;
+
+    const allowed = await requestProFeature('import', 'Import Backup');
+    if (!allowed) return;
     
     isImporting = true;
     error = null;

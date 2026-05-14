@@ -50,6 +50,10 @@ export function t(key: string, options?: Record<string, unknown>): string {
   return String(result ?? key);
 }
 
+export function hasTranslationKey(key: string): boolean {
+  return i18next.exists(key);
+}
+
 // ── Change language ──
 
 export async function changeLanguage(code: string): Promise<void> {

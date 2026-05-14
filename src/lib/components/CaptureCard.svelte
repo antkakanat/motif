@@ -11,6 +11,7 @@
   } from '$lib/stores/selection';
   import { collections } from '$lib/stores/collections';
   import { updateCapture } from '$lib/stores/captures';
+  import { requestProFeature } from '$lib/pro';
 
   let {
     capture,
@@ -98,6 +99,10 @@
   }
 
   async function moveToCollection(collectionId: string | null) {
+    if (collectionId !== null) {
+      const allowed = await requestProFeature('collections', 'Collections');
+      if (!allowed) return;
+    }
     await updateCapture(capture.id, { collectionId });
     closeMenu();
   }

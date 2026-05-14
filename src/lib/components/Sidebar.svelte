@@ -5,7 +5,7 @@
   import { tick } from 'svelte';
   import { collections, addCollection } from '$lib/stores/collections';
   import { activeCaptures } from '$lib/stores/captures';
-  import { isProUnlocked } from '$lib/pro';
+  import { requestProFeature } from '$lib/pro';
   import { resolvedTheme } from '$lib/theme';
   import NavIcon from '$lib/components/NavIcon.svelte';
 
@@ -42,10 +42,8 @@
   }
 
   async function startAdding() {
-    if (!isProUnlocked()) {
-      void goto('/settings');
-      return;
-    }
+    const allowed = await requestProFeature('collections', 'Collections');
+    if (!allowed) return;
     isAdding = true;
     await tick();
     inputEl?.focus();

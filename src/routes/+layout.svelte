@@ -5,6 +5,7 @@
   import BackupReminderBanner from '$lib/components/BackupReminderBanner.svelte';
   import InstallPromptBanner from '$lib/components/InstallPromptBanner.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import ProActionGateModal from '$lib/components/ProActionGateModal.svelte';
   import { initI18n } from '$lib/i18n';
   import { loadCaptures, purgeOldTrash } from '$lib/stores/captures';
   import { loadCollections } from '$lib/stores/collections';
@@ -18,11 +19,13 @@
   import OnlineStatusToast from '$lib/components/OnlineStatusToast.svelte';
   import { initInstallPrompt } from '$lib/stores/installPrompt';
   import { pwaInfo } from 'virtual:pwa-info';
+  import { isForceFreeMode } from '$lib/pro';
 
   let { children } = $props();
   let ready = $state(false);
   let showUpdateToast = $state(false);
   let swRegistration = $state<ServiceWorkerRegistration | undefined>(undefined);
+  let forceFreeMode = $derived(isForceFreeMode());
 
   // Auto-lock idle timer
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -142,12 +145,17 @@
 
 <Toast />
 <OnlineStatusToast />
+<ProActionGateModal />
 
 {#if showUpdateToast}
   <UpdateToast 
     onUpdate={handleUpdate} 
     onDismiss={() => showUpdateToast = false} 
   />
+{/if}
+
+{#if forceFreeMode}
+  <div class="force-free-pill">FORCE FREE</div>
 {/if}
 
 <style>
@@ -212,5 +220,25 @@
     font-weight: 600;
     color: var(--color-text-secondary);
     margin: 0;
+  }
+
+  .force-free-pill {
+    position: fixed;
+    right: 12px;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    z-index: 9999;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #e24b4a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  @media (min-width: 769px) {
+    .force-free-pill {
+      bottom: 12px;
+    }
   }
 </style>

@@ -5,6 +5,7 @@
   import { collections } from '$lib/stores/collections';
   import { exportData } from '$lib/export';
   import { fade, slide } from 'svelte/transition';
+  import { requestProFeature } from '$lib/pro';
 
   let { visibleIds }: { visibleIds: string[] } = $props();
 
@@ -31,12 +32,19 @@
   }
 
   async function handleMove(colId: string | null) {
+    if (colId !== null) {
+      const allowed = await requestProFeature('collections', 'Collections');
+      if (!allowed) return;
+    }
     await bulkMoveToCollection([...$selectedIds], colId);
     showCollectionPicker = false;
     clearSelection();
   }
 
   async function handleExport() {
+    const allowed = await requestProFeature('export', 'Export Backup');
+    if (!allowed) return;
+
     isExporting = true;
     try {
       await exportData('selection', [...$selectedIds]);

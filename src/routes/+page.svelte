@@ -14,6 +14,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { requestProFeature } from '$lib/pro';
 
   let showModal = $state(false);
   let searchQuery = $state('');
@@ -43,8 +44,10 @@
     showModal = true;
   }
 
-  function handleCardOpen(capture: Capture) {
+  async function handleCardOpen(capture: Capture) {
     if (capture.type === 'link') {
+      const allowed = await requestProFeature('readingView', 'Reading View');
+      if (!allowed) return;
       void goto(`/read/${capture.id}`);
       return;
     }

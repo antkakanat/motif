@@ -13,6 +13,7 @@
   import { exportData } from '$lib/export';
   import { installPrompt, nativeInstallReady, initInstallPrompt, promptInstall } from '$lib/stores/installPrompt';
   import { onMount } from 'svelte';
+  import { requestProFeature } from '$lib/pro';
 
   let storageInfo = $state<StorageEstimate | null>(null);
   let licenseKey = $state('');
@@ -58,6 +59,9 @@
   }
 
   async function handleExport() {
+    const allowed = await requestProFeature('export', 'Export Backup');
+    if (!allowed) return;
+
     isExporting = true;
     try {
       await exportData('all');
@@ -119,6 +123,12 @@
       showImportModal = true;
       target.value = ''; // Reset input so same file can be selected again
     }
+  }
+
+  async function openImportPicker() {
+    const allowed = await requestProFeature('import', 'Import Backup');
+    if (!allowed) return;
+    fileInput.click();
   }
 
   const shortcuts = getShortcuts();
@@ -304,7 +314,7 @@
           <p class="setting-hint">Restore data from a Motif ZIP file</p>
         </div>
         <input type="file" accept=".zip" bind:this={fileInput} onchange={handleFileSelect} hidden />
-        <button class="btn-outline" onclick={() => fileInput.click()}>
+        <button class="btn-outline" onclick={openImportPicker}>
           Import ZIP
         </button>
       </div>

@@ -11,6 +11,7 @@
   import { goto } from '$app/navigation';
   import { registerShortcuts } from '$lib/shortcuts';
   import { onMount, tick } from 'svelte';
+  import { requestProFeature } from '$lib/pro';
 
   let collection = $derived($collections.find(c => c.id === $page.params.id));
   let items = $derived($activeCaptures.filter(c => c.collectionId === $page.params.id));
@@ -39,9 +40,20 @@
   }
 
   async function saveRename() {
-    if (collection && editName.trim() && editName.trim() !== collection.name) {
-      await updateCollection(collection.id, { name: editName.trim() });
+    if (!collection) {
+      isEditing = false;
+      return;
     }
+    const nextName = editName.trim();
+    if (!nextName || nextName === collection.name) {
+      isEditing = false;
+      return;
+    }
+
+    const allowed = await requestProFeature('collections', 'Collections');
+    if (!allowed) return;
+
+    await updateCollection(collection.id, { name: nextName });
     isEditing = false;
   }
 
@@ -51,6 +63,9 @@
   }
 
   async function handleDeleteCollection() {
+    const allowed = await requestProFeature('collections', 'Collections');
+    if (!allowed) return;
+
     if (confirm(t('collections.deleteConfirm')) && collection) {
       await deleteCollection(collection.id);
       await goto('/');
@@ -78,8 +93,10 @@
     showModal = true;
   }
 
-  function handleCardOpen(capture: Capture) {
+  async function handleCardOpen(capture: Capture) {
     if (capture.type === 'link') {
+      const allowed = await requestProFeature('readingView', 'Reading View');
+      if (!allowed) return;
       void goto(`/read/${capture.id}`);
       return;
     }

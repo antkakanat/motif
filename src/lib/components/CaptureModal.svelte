@@ -3,7 +3,7 @@
   import { type CaptureType, type Capture } from '$lib/db';
   import { findDuplicateUrl } from '$lib/stores/captures';
   import { collections } from '$lib/stores/collections';
-  import { isProUnlocked } from '$lib/pro';
+  import { isProUnlocked, requestProFeature } from '$lib/pro';
   import NavIcon from '$lib/components/NavIcon.svelte';
 
   type Tab = CaptureType;
@@ -33,7 +33,7 @@
     initialData = null as InitialData | null
   }: {
     open: boolean;
-    onSave: (data: CaptureFormData) => void;
+    onSave: (data: CaptureFormData) => void | Promise<void>;
     defaultTab?: Tab;
     initialData?: InitialData | null;
   } = $props();
@@ -93,14 +93,19 @@
     reset();
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!content.trim() && activeTab !== 'note') return;
+
+    if (collectionId !== null) {
+      const allowed = await requestProFeature('collections', 'Collections');
+      if (!allowed) return;
+    }
 
     // Title priority for link captures:
     // 1. User-entered title (always preserve if provided)
     // 2. OG title fetched from URL (Phase 2 — when proxy is built)
     // 3. URL itself as fallback (current Phase 1 behavior)
-    onSave({
+    await onSave({
       type: activeTab,
       title: title.trim() || (activeTab === 'link' ? content.trim() : t('capture.noTitle')),
       content: content.trim(),

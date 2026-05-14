@@ -10,6 +10,7 @@
   import { registerShortcuts } from '$lib/shortcuts';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { requestProFeature } from '$lib/pro';
 
   const captures = capturesByType('link');
   let visibleIds = $derived($captures.map((c) => c.id));
@@ -36,7 +37,9 @@
     showModal = true;
   }
 
-  function handleCardOpen(capture: Capture) {
+  async function handleCardOpen(capture: Capture) {
+    const allowed = await requestProFeature('readingView', 'Reading View');
+    if (!allowed) return;
     void goto(`/read/${capture.id}`);
   }
 
