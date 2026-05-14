@@ -170,7 +170,7 @@
     .main-content {
       padding: 16px;
       padding-top: calc(16px + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     }
   }
 

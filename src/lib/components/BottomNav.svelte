@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { t } from '$lib/i18n';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -56,26 +56,28 @@
 
 <nav class="bottom-nav" aria-label="Main navigation">
   <a href="/" class="bottom-item" class:active={isActive('/', $page.url.pathname)}>
-    <span class="bottom-icon"><NavIcon name="home" size={18} /></span>
+    <span class="bottom-icon"><NavIcon name="home" size={20} /></span>
     <span class="bottom-label">Home</span>
   </a>
 
   <a href="/links" class="bottom-item" class:active={isActive('/links', $page.url.pathname)}>
-    <span class="bottom-icon"><NavIcon name="link" size={18} /></span>
+    <span class="bottom-icon"><NavIcon name="link" size={20} /></span>
     <span class="bottom-label">{t('nav.links')}</span>
   </a>
 
-  <button class="capture-fab" aria-label={t('capture.addNew')} onclick={() => goto('/?new=1')}>
-    +
-  </button>
+  <div class="fab-container">
+    <button class="capture-fab" aria-label={t('capture.addNew')} onclick={() => goto('/?new=1')}>
+      +
+    </button>
+  </div>
 
   <a href="/?focus=search" class="bottom-item" class:active={$page.url.pathname === '/' && $page.url.searchParams.get('focus') === 'search'}>
-    <span class="bottom-icon"><NavIcon name="search" size={18} /></span>
+    <span class="bottom-icon"><NavIcon name="search" size={20} /></span>
     <span class="bottom-label">Search</span>
   </a>
 
   <button class="bottom-item more-toggle" class:active={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-    <span class="bottom-icon"><NavIcon name="more" size={18} /></span>
+    <span class="bottom-icon"><NavIcon name="more" size={20} /></span>
     <span class="bottom-label">More</span>
   </button>
 </nav>
@@ -87,15 +89,15 @@
     bottom:0;
     left:0;
     right:0;
-    height:calc(72px + env(safe-area-inset-bottom, 0px));
+    height:calc(68px + env(safe-area-inset-bottom, 0px));
     background:var(--color-surface);
     border-top:1px solid var(--color-border);
     z-index:60;
-    padding:0 8px env(safe-area-inset-bottom, 0px);
-    align-items:flex-start;
+    padding:0 4px env(safe-area-inset-bottom, 0px);
+    align-items:center;
     justify-content:space-between;
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
   }
 
   @media (max-width: 768px) {
@@ -104,7 +106,7 @@
 
   .bottom-item {
     flex:1;
-    height:64px;
+    height:100%;
     border:none;
     background:none;
     text-decoration:none;
@@ -114,28 +116,56 @@
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:2px;
-    font-size:11px;
+    gap:4px;
+    font-size:10px;
     font-weight:600;
     cursor:pointer;
-    transition:color var(--duration-fast);
+    transition:all var(--duration-fast);
+    position:relative;
   }
 
   .bottom-item.active { color:var(--color-primary); }
+  
+  .bottom-item.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
+    background: var(--color-primary);
+    border-radius: 0 0 4px 4px;
+  }
+
   .bottom-icon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
+    transition: transform 0.2s var(--ease-out);
+  }
+
+  .bottom-item:active .bottom-icon {
+    transform: scale(0.9);
+  }
+
+  .fab-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    height: 100%;
   }
 
   .capture-fab {
-    width:56px;
-    height:56px;
+    width:52px;
+    height:52px;
     border-radius:50%;
-    margin-top:-14px;
+    margin-top:-28px;
     border:none;
     background:var(--color-primary);
     color:#fff;
@@ -143,13 +173,18 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:1.9rem;
+    font-size:2rem;
     line-height:1;
-    box-shadow:var(--shadow-lg);
+    box-shadow: 0 8px 20px rgba(91, 78, 214, 0.4);
     flex-shrink:0;
+    transition: all 0.2s var(--ease-out);
+    z-index: 2;
   }
 
-  .capture-fab:active { transform:translateY(1px); }
+  .capture-fab:active { 
+    transform: scale(0.92) translateY(2px);
+    box-shadow: 0 4px 10px rgba(91, 78, 214, 0.3);
+  }
 
   .more-toggle {
     border-radius:var(--radius-sm);
@@ -159,20 +194,21 @@
     position:fixed;
     inset:0;
     border:none;
-    background:rgba(8, 8, 16, 0.35);
+    background:rgba(8, 8, 16, 0.4);
     z-index:58;
+    backdrop-filter: blur(2px);
   }
 
   .more-sheet {
     position:fixed;
     left:12px;
     right:12px;
-    bottom:calc(78px + env(safe-area-inset-bottom, 0px));
+    bottom:calc(80px + env(safe-area-inset-bottom, 0px));
     background:var(--color-surface);
     border:1px solid var(--color-border);
-    border-radius:var(--radius-lg);
+    border-radius:var(--radius-xl);
     box-shadow:var(--shadow-xl);
-    padding:14px;
+    padding:16px;
     z-index:59;
   }
 
