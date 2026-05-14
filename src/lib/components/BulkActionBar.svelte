@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { t } from '$lib/i18n';
   import { selectedIds, clearSelection, selectAll } from '$lib/stores/selection';
   import { bulkSoftDelete, bulkUpdateTags, bulkMoveToCollection } from '$lib/stores/captures';
@@ -21,7 +21,7 @@
   }
 
   async function handleAddTags() {
-    const tags = tagInput.split(',').map(t => t.trim()).filter(Boolean);
+    const tags = tagInput.split(',').map((entry) => entry.trim()).filter(Boolean);
     if (tags.length > 0) {
       await bulkUpdateTags([...$selectedIds], tags, true);
       tagInput = '';
@@ -60,6 +60,7 @@
 </script>
 
 {#if $selectedIds.size > 0}
+  <div class="bulk-bar-spacer" aria-hidden="true"></div>
   <div class="bulk-bar-container" transition:fade={{ duration: 200 }}>
     <div class="bulk-bar shadow-lg">
       <div class="selection-info">
@@ -70,40 +71,36 @@
       <div class="divider"></div>
 
       <div class="actions">
-        <!-- Select All / Clear -->
         <button class="btn-ghost" onclick={() => selectAll(visibleIds)}>{t('common.selectAll', { defaultValue: 'Select All' })}</button>
         <button class="btn-ghost" onclick={clearSelection}>{t('capture.cancel')}</button>
 
         <div class="divider"></div>
 
-        <!-- Tagging -->
         <div class="action-wrapper">
           <button class="btn-action" onclick={toggleTagPicker}>
-            <span class="icon">🏷️</span> {t('tags.addTag')}
+            <span class="icon">#</span> {t('tags.addTag')}
           </button>
           {#if showTagPicker}
             <div class="picker tag-picker" transition:slide={{ duration: 150 }}>
-              <input 
-                type="text" 
-                bind:value={tagInput} 
-                placeholder="Tags (comma separated)..." 
+              <input
+                type="text"
+                bind:value={tagInput}
+                placeholder="Tags (comma separated)..."
                 onkeydown={(e) => e.key === 'Enter' && handleAddTags()}
-                autofocus
               />
               <button class="btn-primary" onclick={handleAddTags}>{t('capture.save')}</button>
             </div>
           {/if}
         </div>
 
-        <!-- Collections -->
         <div class="action-wrapper">
           <button class="btn-action" onclick={toggleCollectionPicker}>
-            <span class="icon">📂</span> {t('nav.collections')}
+            <span class="icon">+</span> {t('nav.collections')}
           </button>
           {#if showCollectionPicker}
             <div class="picker collection-picker" transition:slide={{ duration: 150 }}>
               <button class="picker-item" onclick={() => handleMove(null)}>
-                <em>— {t('collections.none')} —</em>
+                <em>- {t('collections.none')} -</em>
               </button>
               {#each $collections as col}
                 <button class="picker-item" onclick={() => handleMove(col.id)}>
@@ -115,15 +112,13 @@
           {/if}
         </div>
 
-        <!-- Export -->
         <button class="btn-action" onclick={handleExport} disabled={isExporting}>
-          <span class="icon">{isExporting ? '⏳' : '📥'}</span> 
+          <span class="icon">{isExporting ? '…' : '⇩'}</span>
           {isExporting ? '...' : t('settings.exportData') || 'Export'}
         </button>
 
-        <!-- Delete -->
         <button class="btn-action danger" onclick={handleDelete}>
-          <span class="icon">🗑️</span> {t('capture.delete')}
+          <span class="icon">×</span> {t('capture.delete')}
         </button>
       </div>
     </div>
@@ -131,6 +126,10 @@
 {/if}
 
 <style>
+  .bulk-bar-spacer {
+    height: 88px;
+  }
+
   .bulk-bar-container {
     position: fixed;
     bottom: 24px;
@@ -316,12 +315,40 @@
   }
 
   @media (max-width: 768px) {
+    .bulk-bar-spacer {
+      height: calc(64px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .bulk-bar-container {
+      bottom: calc(72px + 8px);
+      left: 12px;
+      right: 12px;
+      transform: none;
+      max-width: none;
+    }
+
     .bulk-bar {
       gap: 8px;
-      padding: 6px 10px;
+      width: 100%;
+      padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+      border-radius: var(--radius-lg);
+      overflow-x: auto;
     }
-    .btn-action .icon { font-size: 1.125rem; }
-    .btn-action span:not(.icon) { display: none; }
-    .label { display: none; }
+
+    .actions {
+      min-width: max-content;
+    }
+
+    .btn-action .icon {
+      font-size: 1.125rem;
+    }
+
+    .btn-action span:not(.icon) {
+      display: none;
+    }
+
+    .label {
+      display: none;
+    }
   }
 </style>

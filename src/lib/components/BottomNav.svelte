@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { collections } from '$lib/stores/collections';
+  import NavIcon from '$lib/components/NavIcon.svelte';
 
   let moreOpen = $state(false);
 
@@ -17,12 +18,12 @@
   }
 
   const moreItems = [
-    { href: '/quotes', icon: '❞', label: t('nav.quotes') },
-    { href: '/notes', icon: '✎', label: t('nav.notes') },
-    { href: '/images', icon: '▣', label: t('nav.images') },
-    { href: '/archived', icon: '⌂', label: t('status.archived') },
-    { href: '/trash', icon: '🗑', label: t('nav.trash') },
-    { href: '/settings', icon: '⚙', label: t('nav.settings') }
+    { href: '/quotes', icon: 'quote', label: t('nav.quotes') },
+    { href: '/notes', icon: 'note', label: t('nav.notes') },
+    { href: '/images', icon: 'image', label: t('nav.images') },
+    { href: '/archived', icon: 'archived', label: t('status.archived') },
+    { href: '/trash', icon: 'trash', label: t('nav.trash') },
+    { href: '/settings', icon: 'settings', label: t('nav.settings') }
   ];
 </script>
 
@@ -33,19 +34,19 @@
     <div class="sheet-grid">
       {#each moreItems as item}
         <a href={item.href} class="sheet-item" class:active={isActive(item.href, $page.url.pathname)}>
-          <span class="sheet-icon">{item.icon}</span>
+          <span class="sheet-icon"><NavIcon name={item.icon} size={17} /></span>
           <span>{item.label}</span>
         </a>
       {/each}
 
       {#if $collections.length > 0}
         <a href={`/collections/${$collections[0].id}`} class="sheet-item" title={t('nav.collections')}>
-          <span class="sheet-icon">●</span>
+          <span class="sheet-icon"><NavIcon name="collections" size={17} /></span>
           <span>{t('nav.collections')}</span>
         </a>
       {:else}
         <a href="/settings" class="sheet-item" title={t('nav.collections')}>
-          <span class="sheet-icon">●</span>
+          <span class="sheet-icon"><NavIcon name="collections" size={17} /></span>
           <span>{t('nav.collections')}</span>
         </a>
       {/if}
@@ -55,12 +56,12 @@
 
 <nav class="bottom-nav" aria-label="Main navigation">
   <a href="/" class="bottom-item" class:active={isActive('/', $page.url.pathname)}>
-    <span class="bottom-icon">▦</span>
+    <span class="bottom-icon"><NavIcon name="home" size={18} /></span>
     <span class="bottom-label">Home</span>
   </a>
 
   <a href="/links" class="bottom-item" class:active={isActive('/links', $page.url.pathname)}>
-    <span class="bottom-icon">🔗</span>
+    <span class="bottom-icon"><NavIcon name="link" size={18} /></span>
     <span class="bottom-label">{t('nav.links')}</span>
   </a>
 
@@ -69,12 +70,12 @@
   </button>
 
   <a href="/?focus=search" class="bottom-item" class:active={$page.url.pathname === '/' && $page.url.searchParams.get('focus') === 'search'}>
-    <span class="bottom-icon">⌕</span>
+    <span class="bottom-icon"><NavIcon name="search" size={18} /></span>
     <span class="bottom-label">Search</span>
   </a>
 
   <button class="bottom-item more-toggle" class:active={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-    <span class="bottom-icon">⋯</span>
+    <span class="bottom-icon"><NavIcon name="more" size={18} /></span>
     <span class="bottom-label">More</span>
   </button>
 </nav>
@@ -121,7 +122,14 @@
   }
 
   .bottom-item.active { color:var(--color-primary); }
-  .bottom-icon { font-size:1.1rem; line-height:1; }
+  .bottom-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
 
   .capture-fab {
     width:56px;
@@ -205,5 +213,11 @@
     background:var(--color-primary-subtle);
   }
 
-  .sheet-icon { font-size:1rem; }
+  .sheet-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 </style>

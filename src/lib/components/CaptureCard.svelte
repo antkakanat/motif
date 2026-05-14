@@ -1,7 +1,14 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import type { Capture } from '$lib/db';
-  import { selectedIds, isSelectionActive, toggleSelection, rangeSelect } from '$lib/stores/selection';
+  import {
+    selectedIds,
+    isSelectionActive,
+    selectionMode,
+    toggleSelection,
+    rangeSelect,
+    enterSelectionMode
+  } from '$lib/stores/selection';
   import { collections } from '$lib/stores/collections';
   import { updateCapture } from '$lib/stores/captures';
 
@@ -11,6 +18,7 @@
     onArchive,
     onRestore,
     onEdit,
+    onOpen,
     visibleIds
   }: {
     capture: Capture;
@@ -18,14 +26,17 @@
     onArchive?: (id: string) => void;
     onRestore?: (id: string) => void;
     onEdit?: (capture: Capture) => void;
+    onOpen?: (capture: Capture) => void;
     visibleIds?: string[];
   } = $props();
 
   let showMenu = $state(false);
   let showCollectionPicker = $state(false);
   let isSelected = $derived($selectedIds.has(capture.id));
+  let isSelectionMode = $derived($selectionMode === 'selection');
 
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  let longPressTriggered = $state(false);
 
   const typeLabels: Record<string, string> = {
     link: 'Link',
@@ -96,41 +107,86 @@
     closeMenu();
   }
 
+  $effect(() => {
+    if (isSelectionMode && showMenu) {
+      closeMenu();
+    }
+  });
+
   function handleCardClick(e: MouseEvent) {
+    if (longPressTriggered) {
+      longPressTriggered = false;
+      return;
+    }
+
+    if (isSelectionMode) {
+      toggleSelection(capture.id, { enterMode: false });
+      return;
+    }
+
     if (e.shiftKey && visibleIds) {
       e.preventDefault();
       rangeSelect(capture.id, visibleIds);
+      return;
     }
+
+    onOpen?.(capture);
+  }
+
+  function handleCardKeydown(e: KeyboardEvent) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+
+    if (isSelectionMode) {
+      toggleSelection(capture.id, { enterMode: false });
+      return;
+    }
+
+    onOpen?.(capture);
   }
 
   function toggle() {
-    toggleSelection(capture.id);
+    if (!isSelectionMode) {
+      enterSelectionMode();
+    }
+    toggleSelection(capture.id, { enterMode: false });
   }
 
   function handleLongPressStart() {
+    if (isSelectionMode) return;
     longPressTimer = setTimeout(() => {
-      toggleSelection(capture.id);
-    }, 600);
+      longPressTriggered = true;
+      enterSelectionMode();
+      toggleSelection(capture.id, { enterMode: false });
+    }, 550);
   }
 
   function handleLongPressEnd() {
     if (longPressTimer) {
       clearTimeout(longPressTimer);
+      longPressTimer = null;
     }
   }
 </script>
 
-<article
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
   class="card fade-in"
   class:trashed={capture.isTrashed}
   class:selected={isSelected}
+  class:selection-mode={isSelectionMode}
+  role="button"
+  tabindex="0"
   onclick={handleCardClick}
+  onkeydown={handleCardKeydown}
   onmousedown={handleLongPressStart}
   onmouseup={handleLongPressEnd}
+  onmouseleave={handleLongPressEnd}
   ontouchstart={handleLongPressStart}
   ontouchend={handleLongPressEnd}
+  ontouchcancel={handleLongPressEnd}
 >
-  <div class="card-header">
+  <div class="card-meta-row">
     <div class="selection-control" class:active={$isSelectionActive || isSelected}>
       <input
         type="checkbox"
@@ -142,46 +198,56 @@
     </div>
 
     <span class={`type-pill type-${capture.type}`}>{typeLabels[capture.type]}</span>
-    {#if capture.status === 'unread'}
-      <span class="status-dot unread" aria-label={t('status.unread')}></span>
-    {:else if capture.status === 'archived'}
-      <span class="status-pill">{t('status.archived')}</span>
-    {/if}
-
     <span class="card-date">{formatDate(capture.createdAt)}</span>
-    <button class="menu-btn" onclick={(e) => { e.stopPropagation(); showMenu = !showMenu; }}>...</button>
+    {#if !isSelectionMode}
+      <button class="menu-btn" onclick={(e) => { e.stopPropagation(); showMenu = !showMenu; }} aria-label="Card actions">...</button>
+    {/if}
   </div>
 
   <div class="card-body">
-    <h3 class="card-title">{truncate(capture.title || t('capture.noTitle'), 80)}</h3>
+    <h3 class="card-title">{truncate(capture.title || t('capture.noTitle'), 96)}</h3>
 
     {#if capture.type === 'image' && capture.content}
-      <img src={capture.content} alt={capture.title} class="card-image" loading="lazy" />
+      <div class="image-shell">
+        <img src={capture.content} alt={capture.title} class="card-image" loading="lazy" />
+      </div>
     {:else if capture.type === 'quote'}
-      <blockquote class="card-quote">"{truncate(capture.content, 200)}"</blockquote>
+      <blockquote class="card-quote">"{truncate(capture.content, 220)}"</blockquote>
     {:else if capture.type === 'link'}
       <div class="link-container">
-        <a href={capture.content} class="card-link" target="_blank" rel="noopener">{truncate(capture.content, 50)}</a>
-        <a href="/read/{capture.id}" class="read-card-btn" onclick={(e) => e.stopPropagation()}>
-          Read
-        </a>
+        <p class="card-link">{truncate(capture.content, 72)}</p>
       </div>
     {:else}
       <p class="card-preview">{truncate(getPreview(), 200)}</p>
     {/if}
   </div>
 
-  {#if capture.tags.length > 0}
-    <div class="card-tags">
-      {#each capture.tags as tag}
-        <span class="card-tag">{tag}</span>
-      {/each}
+  <div class="card-footer">
+    <div class="footer-status">
+      {#if capture.status === 'unread'}
+        <span class="status-dot unread" aria-hidden="true"></span>
+        <span class="sr-only">{t('status.unread')}</span>
+      {:else if capture.status === 'archived'}
+        <span class="status-pill">{t('status.archived')}</span>
+      {/if}
     </div>
-  {/if}
+    <div class="footer-right">
+      {#if capture.type === 'link' && !isSelectionMode}
+        <span class="open-indicator">Open &gt;</span>
+      {/if}
+      {#if capture.tags.length > 0}
+        <div class="card-tags">
+          {#each capture.tags.slice(0, 2) as tag}
+            <span class="card-tag">{tag}</span>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
 
-  {#if showMenu}
+  {#if showMenu && !isSelectionMode}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="ctx-menu scale-in" onclick={(e) => e.stopPropagation()}>
+    <div class="ctx-menu scale-in" role="menu" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       {#if !capture.isTrashed}
         {#if onEdit}
           <button class="mi" onclick={() => { onEdit(capture); closeMenu(); }}>Edit</button>
@@ -228,7 +294,7 @@
       {/if}
     </div>
   {/if}
-</article>
+</div>
 
 <style>
   .card {
@@ -236,14 +302,24 @@
     background:var(--color-surface);
     border:1px solid var(--color-border);
     border-radius:var(--radius-lg);
-    padding:16px;
+    padding:14px 14px 12px;
     transition:all var(--duration-fast) var(--ease-out);
+    cursor:pointer;
   }
 
   .card:hover {
     border-color:var(--color-primary);
-    box-shadow:var(--shadow-sm);
+    box-shadow:var(--shadow-md);
     transform:translateY(-1px);
+  }
+
+  .card:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .card.selection-mode {
+    cursor: pointer;
   }
 
   .card.selected {
@@ -258,8 +334,8 @@
     display:none;
     align-items:center;
     justify-content:center;
-    width:18px;
-    height:18px;
+    width:20px;
+    height:20px;
     margin-right:4px;
   }
 
@@ -269,13 +345,13 @@
   }
 
   .selection-control input {
-    width:16px;
-    height:16px;
+    width:18px;
+    height:18px;
     cursor:pointer;
     accent-color:var(--color-primary);
   }
 
-  .card-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .card-meta-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
   .type-pill {
     padding: 2px 8px;
     border-radius: var(--radius-full);
@@ -328,38 +404,50 @@
 
   .menu-btn:hover { background:var(--color-primary-subtle); color:var(--color-primary); }
 
-  .card-body { margin-bottom:8px; }
-  .card-title { font-size:15px; font-weight:600; color:var(--color-text); margin:0 0 6px; line-height:1.4; }
-  .card-image { width:100%; max-height:180px; object-fit:cover; border-radius:var(--radius-md); margin-top:8px; }
+  .card-body { margin-bottom:10px; display:flex; flex-direction:column; gap:8px; }
+  .card-title { font-size:1.05rem; font-weight:650; color:var(--color-text); margin:0; line-height:1.35; }
+  .image-shell {
+    width: 100%;
+    height: 180px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  }
+  .card-image { width:100%; height:100%; object-fit:cover; display:block; }
   .card-quote { margin:0; padding:8px 12px; border-left:3px solid var(--color-primary); background:var(--color-primary-subtle); border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:13px; font-style:italic; line-height:1.6; }
-  .card-link { font-size:13px; color:var(--color-primary); text-decoration:none; word-break:break-all; flex:1; }
-  .card-link:hover { text-decoration:underline; }
-  .link-container { display:flex; align-items:center; gap:12px; margin-top:4px; }
-
-  .read-card-btn {
-    display:inline-flex;
-    align-items:center;
-    gap:4px;
-    font-size:12px;
-    color:var(--color-text-secondary);
-    text-decoration:none;
-    padding:4px 8px;
-    background:var(--color-surface);
-    border:1px solid var(--color-border);
-    border-radius:var(--radius-sm);
-    white-space:nowrap;
-    transition:all var(--duration-fast);
-  }
-
-  .read-card-btn:hover {
-    background:var(--color-primary-subtle);
-    color:var(--color-primary);
-    border-color:var(--color-primary);
-  }
+  .card-link { font-size:13px; color:var(--color-primary); margin:0; word-break:break-word; line-height:1.45; }
+  .link-container { display:flex; align-items:center; gap:12px; }
 
   .card-preview { font-size:13px; color:var(--color-text-secondary); margin:0; line-height:1.5; }
-  .card-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+  .card-footer {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    padding-top: 8px;
+  }
+  .footer-status { display:flex; align-items:center; gap:6px; min-width: 0; }
+  .footer-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .open-indicator {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    white-space: nowrap;
+  }
+  .card-tags { display:flex; flex-wrap:wrap; gap:4px; }
   .card-tag { padding:2px 8px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-full); font-size:11px; font-weight:500; }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
   .ctx-menu {
     position:absolute;
@@ -413,4 +501,22 @@
 
   .italic { font-style:italic; opacity:0.7; }
   .dot { width:8px; height:8px; border-radius:50%; }
+
+  @media (max-width: 768px) {
+    .card {
+      padding: 14px 14px 12px;
+    }
+    .image-shell {
+      height: 190px;
+    }
+  }
+
+  :global([data-theme='dark']) .card {
+    border-color: color-mix(in srgb, var(--color-border) 75%, #ffffff 25%);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-border) 35%, transparent);
+  }
+
+  :global([data-theme='dark']) .card-footer {
+    border-top-color: color-mix(in srgb, var(--color-border) 88%, transparent);
+  }
 </style>

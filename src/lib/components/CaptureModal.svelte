@@ -22,6 +22,7 @@
     content?: string;
     sourceUrl?: string;
     collectionId?: string | null;
+    tags?: string[];
   }
 
   let {
@@ -48,8 +49,11 @@
         content = initialData.content || '';
         sourceUrl = initialData.sourceUrl || '';
         collectionId = initialData.collectionId || null;
+        tags = initialData.tags ? [...initialData.tags] : [];
+        tagInput = '';
       } else {
         activeTab = defaultTab;
+        reset();
       }
     }
   });

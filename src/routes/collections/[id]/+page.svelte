@@ -2,9 +2,11 @@
   import { page } from '$app/stores';
   import { t } from '$lib/i18n';
   import { collections, updateCollection, deleteCollection } from '$lib/stores/collections';
-  import { activeCaptures, softDeleteCapture, updateCapture } from '$lib/stores/captures';
+  import { activeCaptures, softDeleteCapture, updateCapture, addCapture, type CreateCaptureInput } from '$lib/stores/captures';
   import { clearSelection, selectAll } from '$lib/stores/selection';
   import CaptureCard from '$lib/components/CaptureCard.svelte';
+  import CaptureModal from '$lib/components/CaptureModal.svelte';
+  import type { Capture, CaptureType } from '$lib/db';
   import BulkActionBar from '$lib/components/BulkActionBar.svelte';
   import { goto } from '$app/navigation';
   import { registerShortcuts } from '$lib/shortcuts';
@@ -22,6 +24,9 @@
   });
 
   let isEditing = $state(false);
+  let showModal = $state(false);
+  let editingCapture = $state<Capture | null>(null);
+  let initialModalData = $state<any>(null);
   let editName = $state('');
   let inputEl = $state<HTMLInputElement | null>(null);
 
@@ -58,6 +63,45 @@
 
   async function handleArchiveCapture(id: string) {
     await updateCapture(id, { status: 'archived' });
+  }
+
+  function openEditModal(capture: Capture) {
+    editingCapture = capture;
+    initialModalData = {
+      type: capture.type,
+      title: capture.title,
+      content: capture.content,
+      sourceUrl: capture.sourceUrl ?? '',
+      collectionId: capture.collectionId ?? null,
+      tags: [...capture.tags]
+    };
+    showModal = true;
+  }
+
+  function handleCardOpen(capture: Capture) {
+    if (capture.type === 'link') {
+      void goto(`/read/${capture.id}`);
+      return;
+    }
+    openEditModal(capture);
+  }
+
+  async function handleSave(data: { type: CaptureType; title: string; content: string; tags: string[]; sourceUrl: string; collectionId: string | null }) {
+    if (editingCapture) {
+      await updateCapture(editingCapture.id, {
+        type: data.type,
+        title: data.title,
+        content: data.content,
+        tags: data.tags,
+        sourceUrl: data.sourceUrl || null,
+        collectionId: data.collectionId ?? null
+      });
+      editingCapture = null;
+      initialModalData = null;
+      return;
+    }
+
+    await addCapture(data as CreateCaptureInput);
   }
 </script>
 
@@ -99,7 +143,9 @@
           <CaptureCard 
             {capture} 
             onDelete={handleDeleteCapture} 
-            onArchive={handleArchiveCapture} 
+            onArchive={handleArchiveCapture}
+            onEdit={openEditModal}
+            onOpen={handleCardOpen}
             {visibleIds}
           />
         {/each}
@@ -119,6 +165,7 @@
 </div>
 
 <BulkActionBar {visibleIds} />
+<CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
 
 <style>
   .page { max-width: 100%; }

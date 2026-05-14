@@ -8,6 +8,7 @@
 
   const DISMISSED_TS_KEY = 'motif_install_dismissed_ts';
   const INSTALLED_KEY = 'motif_installed';
+  const VISIT_COUNT_KEY = 'motif_install_visit_count';
   const REAPPEAR_HOURS = 72;
 
   let deferredPrompt = $state<BeforeInstallPromptEvent | null>(null);
@@ -36,6 +37,9 @@
       const hoursSinceDismissal = (Date.now() - parseInt(dismissedTs)) / (1000 * 60 * 60);
       if (hoursSinceDismissal < REAPPEAR_HOURS) return;
     }
+
+    const visits = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
+    if (visits < 2) return;
 
     // 4. Detect OS
     const ua = navigator.userAgent.toLowerCase();
@@ -67,6 +71,9 @@
   }
 
   onMount(() => {
+    const previousVisits = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
+    localStorage.setItem(VISIT_COUNT_KEY, String(previousVisits + 1));
+
     checkEligibility();
 
     const onBeforeInstallPrompt = (event: Event) => {

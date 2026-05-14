@@ -21,13 +21,41 @@
   let filterStatus = $state<CaptureStatus | 'all' | 'active'>('active');
   let searchResults = $state<SearchResult[]>([]);
   let initialModalData = $state<any>(null);
+  let editingCapture = $state<Capture | null>(null);
   let lastHandledParamSignature = $state('');
+
+  function openNewCapture() {
+    editingCapture = null;
+    initialModalData = null;
+    showModal = true;
+  }
+
+  function openEditModal(capture: Capture) {
+    editingCapture = capture;
+    initialModalData = {
+      type: capture.type,
+      title: capture.title,
+      content: capture.content,
+      sourceUrl: capture.sourceUrl ?? '',
+      collectionId: capture.collectionId ?? null,
+      tags: [...capture.tags]
+    };
+    showModal = true;
+  }
+
+  function handleCardOpen(capture: Capture) {
+    if (capture.type === 'link') {
+      void goto(`/read/${capture.id}`);
+      return;
+    }
+    openEditModal(capture);
+  }
 
   function handleRouteParams() {
     const statusParam = $page.url.searchParams.get('status');
-    const openNewCapture = $page.url.searchParams.get('new') === '1';
+    const openNewCaptureParam = $page.url.searchParams.get('new') === '1';
     const focusSearch = $page.url.searchParams.get('focus') === 'search';
-    const signature = `${statusParam ?? ''}|${openNewCapture}|${focusSearch}`;
+    const signature = `${statusParam ?? ''}|${openNewCaptureParam}|${focusSearch}`;
     if (signature === lastHandledParamSignature) return;
     lastHandledParamSignature = signature;
 
@@ -35,8 +63,8 @@
       filterStatus = statusParam;
     }
 
-    if (openNewCapture) {
-      showModal = true;
+    if (openNewCaptureParam) {
+      openNewCapture();
     }
 
     if (focusSearch) {
@@ -45,7 +73,7 @@
       });
     }
 
-    if (statusParam || openNewCapture || focusSearch) {
+    if (statusParam || openNewCaptureParam || focusSearch) {
       void goto('/', { replaceState: true });
     }
   }
@@ -53,7 +81,7 @@
   // Register shortcuts + start onboarding for new users
   onMount(() => {
     registerShortcuts([
-      { key: 'k', label: 'New Capture', description: 'Open capture modal', ctrlOrCmd: true, handler: () => showModal = true },
+      { key: 'k', label: 'New Capture', description: 'Open capture modal', ctrlOrCmd: true, handler: () => openNewCapture() },
       { key: 'f', label: 'Search', description: 'Focus search', ctrlOrCmd: true, handler: () => document.getElementById('search-input')?.focus() },
       { key: 'A', label: 'Select All', description: 'Select all visible', shift: true, handler: () => selectAll(visibleIds) },
       { key: 'Escape', label: 'Close/Clear', description: 'Close modal or clear selection', ctrlOrCmd: false, handler: () => { 
@@ -87,6 +115,7 @@
         title: shareTitle || '',
         content: shareUrl || shareText || '',
       };
+      editingCapture = null;
       showModal = true;
       // Clear URL params
       void goto('/', { replaceState: true });
@@ -183,7 +212,21 @@
 
   let visibleIds = $derived(displayedCaptures.map(c => c.id));
 
-  async function handleSave(data: { type: CaptureType; title: string; content: string; tags: string[]; sourceUrl: string }) {
+  async function handleSave(data: { type: CaptureType; title: string; content: string; tags: string[]; sourceUrl: string; collectionId: string | null }) {
+    if (editingCapture) {
+      await updateCapture(editingCapture.id, {
+        type: data.type,
+        title: data.title,
+        content: data.content,
+        tags: data.tags,
+        sourceUrl: data.sourceUrl || null,
+        collectionId: data.collectionId ?? null
+      });
+      editingCapture = null;
+      initialModalData = null;
+      return;
+    }
+
     await addCapture(data as CreateCaptureInput);
   }
 
@@ -206,7 +249,7 @@
       </div>
       <span class="privacy-badge">Private by default</span>
     </div>
-    <button id="btn-new-capture" class="btn-new" onclick={() => showModal = true}
+    <button id="btn-new-capture" class="btn-new" onclick={openNewCapture}
       title={t('shortcuts.newCapture')}>
       <span class="btn-icon">+</span>
       <span class="btn-label">{t('capture.addNew')}</span>
@@ -238,7 +281,7 @@
         <option value="image">{t('nav.images')}</option>
       </select>
       <select class="filter-select" bind:value={filterStatus}>
-        <option value="active">Active (Unread + Saved)</option>
+        <option value="active">{t('filter.inbox')}</option>
         <option value="all">{t('filter.allStatuses')}</option>
         <option value="unread">{t('status.unread')}</option>
         <option value="saved">{t('status.saved')}</option>
@@ -253,8 +296,10 @@
       {#each displayedCaptures as capture (capture.id)}
         <CaptureCard 
           {capture} 
-          onDelete={handleDelete} 
-          onArchive={handleArchive} 
+          onDelete={handleDelete}
+          onArchive={handleArchive}
+          onEdit={openEditModal}
+          onOpen={handleCardOpen}
           {visibleIds}
         />
       {/each}
@@ -269,7 +314,7 @@
         {searchQuery ? '' : t('empty.allCapturesHint')}
       </p>
       {#if !searchQuery}
-        <button class="btn-empty" onclick={() => showModal = true}>
+        <button class="btn-empty" onclick={openNewCapture}>
           <span>+</span> {t('capture.addNew')}
         </button>
       {/if}

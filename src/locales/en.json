@@ -64,6 +64,7 @@
   },
   "filter": {
     "allTypes": "All Types",
+    "inbox": "Inbox (Unread + Saved)",
     "allStatuses": "All Statuses",
     "dateRange": "Date Range",
     "clearFilters": "Clear Filters"

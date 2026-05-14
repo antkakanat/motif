@@ -1,14 +1,9 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { settings, shouldShowBackupReminder } from '$lib/stores/settings';
+  import { shouldShowBackupReminder } from '$lib/stores/settings';
+  import { goto } from '$app/navigation';
 
   let dismissed = $state(false);
-
-  // Reactively derive visibility from the settings store.
-  // Shows when:
-  //   - lastBackupAt is null AND install is older than 30 days, OR
-  //   - lastBackupAt is set and more than 30 days ago
-  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
   let visible = $derived.by(() => {
     if (dismissed) return false;
@@ -18,23 +13,75 @@
 
 {#if visible}
   <div class="banner fade-in" role="alert">
-    <span class="banner-icon">💾</span>
+    <span class="banner-icon" aria-hidden="true">*</span>
     <p class="banner-text">{t('settings.backupReminder')}</p>
-    <div class="banner-actions">
-      <button class="banner-btn" disabled title="Export coming in Phase 2">
-        {t('settings.backupNow')}
-      </button>
-      <button class="banner-close" onclick={() => dismissed = true} aria-label="Dismiss">✕</button>
-    </div>
+    <button class="banner-link" onclick={() => goto('/settings')}>
+      {t('settings.backupNow')}
+    </button>
+    <button class="banner-close" onclick={() => dismissed = true} aria-label="Dismiss">x</button>
   </div>
 {/if}
 
 <style>
-  .banner { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--color-primary-subtle); border:1px solid var(--color-border); border-radius:var(--radius-md); margin:0 0 16px; }
-  .banner-icon { font-size:20px; flex-shrink:0; }
-  .banner-text { flex:1; font-size:13px; color:var(--color-text); margin:0; }
-  .banner-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-  .banner-btn { padding:6px 14px; background:var(--color-primary); color:white; border:none; border-radius:var(--radius-md); font-size:12px; font-weight:500; cursor:pointer; font-family:var(--font-sans); }
-  .banner-btn:disabled { opacity:0.5; cursor:not-allowed; }
-  .banner-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary); font-size:16px; padding:4px; }
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin: 0 0 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+    background: color-mix(in srgb, var(--color-primary-subtle) 74%, transparent);
+  }
+
+  .banner-icon {
+    font-size: 13px;
+    opacity: 0.75;
+    flex-shrink: 0;
+  }
+
+  .banner-text {
+    flex: 1;
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.35;
+  }
+
+  .banner-link {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+
+  .banner-link:hover {
+    background: var(--color-primary-subtle);
+  }
+
+  .banner-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+  }
+
+  @media (max-width: 768px) {
+    .banner {
+      gap: 8px;
+      padding: 8px 10px;
+    }
+
+    .banner-text {
+      font-size: 11px;
+    }
+  }
 </style>

@@ -66,6 +66,7 @@ export interface CreateCaptureInput {
   ogImage?: string;
   ogTitle?: string;
   status?: CaptureStatus;
+  collectionId?: string | null;
 }
 
 export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
@@ -78,7 +79,7 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     ogImage: input.ogImage ?? null,
     ogTitle: input.ogTitle ?? null,
     tags: input.tags ?? [],
-    collectionId: null,
+    collectionId: input.collectionId ?? null,
     isTrashed: false,
     trashedAt: null,
     createdAt: now(),
@@ -86,11 +87,6 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     ocrText: null,
     sourceUrl: input.sourceUrl ?? null
   };
-
-  // Auto-fetch metadata for links if missing
-  if (capture.type === 'link' && !capture.ogTitle && !capture.ogImage) {
-    void fetchMetadata(capture.id, capture.content);
-  }
 
   await db.captures.add(capture);
 
@@ -105,6 +101,11 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
   // Dismiss onboarding permanently on first real capture
   if (!isOnboardingDone()) {
     await completeOnboarding();
+  }
+
+  // Save first, enrich in background.
+  if (capture.type === 'link' && !capture.ogTitle && !capture.ogImage) {
+    void fetchMetadata(capture.id, capture.content);
   }
 
   return capture;
@@ -220,19 +221,158 @@ export async function getAllTags(): Promise<string[]> {
 
 // ── Metadata fetching ──
 
+const COMMON_TAG_THRESHOLD = 5;
+const AUTO_TAG_LIMIT = 4;
+const TAG_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'over', 'under', 'your',
+  'you', 'our', 'their', 'about', 'after', 'before', 'while', 'when', 'where', 'which',
+  'have', 'has', 'had', 'are', 'was', 'were', 'will', 'would', 'could', 'should',
+  'not', 'but', 'all', 'any', 'can', 'more', 'less', 'new', 'news', 'update', 'updates',
+  'site', 'blog', 'home', 'page', 'www', 'http', 'https', 'html', 'php', 'com', 'org',
+  'net', 'dev', 'app', 'co', 'io'
+]);
+const DOMAIN_NOISE = new Set(['www', 'com', 'org', 'net', 'dev', 'app', 'co', 'io', 'ph']);
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/[\s_-]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !/^\d+$/.test(token));
+}
+
+function getDomainTokens(url: string): Set<string> {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    const tokens = tokenize(hostname.replace(/\./g, ' '));
+    return new Set(tokens.filter((token) => !DOMAIN_NOISE.has(token)));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function looksLikeUrl(text: string): boolean {
+  const value = text.trim().toLowerCase();
+  if (!value) return false;
+  if (/^https?:\/\//.test(value)) return true;
+  return /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/.test(value);
+}
+
+function normalizeUrlLike(text: string): string {
+  try {
+    const u = new URL(text);
+    return `${u.protocol}//${u.hostname.toLowerCase()}${u.pathname.replace(/\/$/, '')}${u.search}`;
+  } catch {
+    return text.trim().toLowerCase().replace(/\/$/, '');
+  }
+}
+
+function shouldAutoReplaceTitle(existingTitle: string, url: string): boolean {
+  const current = existingTitle.trim();
+  if (!current) return true;
+
+  const lower = current.toLowerCase();
+  if (lower === 'untitled') return true;
+  if (looksLikeUrl(current)) return true;
+  if (normalizeUrlLike(current) === normalizeUrlLike(url)) return true;
+
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    if (lower === host) return true;
+  } catch {
+    // Ignore parse errors.
+  }
+
+  return false;
+}
+
+function getTagFrequencyMap(allCaptures: Capture[]): Map<string, number> {
+  const frequency = new Map<string, number>();
+  for (const item of allCaptures) {
+    const unique = new Set(item.tags.map((tag) => tag.toLowerCase()));
+    for (const tag of unique) {
+      frequency.set(tag, (frequency.get(tag) ?? 0) + 1);
+    }
+  }
+  return frequency;
+}
+
+function suggestAutoTags(params: {
+  title: string;
+  description?: string | null;
+  url: string;
+  allCaptures: Capture[];
+  existingTags: string[];
+}): string[] {
+  const titleTokens = new Set(tokenize(params.title));
+  const descriptionTokens = new Set(tokenize(params.description ?? ''));
+  const domainTokens = getDomainTokens(params.url);
+  const existing = new Set(params.existingTags.map((tag) => tag.toLowerCase()));
+  const frequency = getTagFrequencyMap(params.allCaptures);
+  const scores = new Map<string, number>();
+
+  const addScore = (token: string, score: number) => {
+    if (TAG_STOPWORDS.has(token)) return;
+    if (existing.has(token)) return;
+    if ((frequency.get(token) ?? 0) >= COMMON_TAG_THRESHOLD) return;
+    scores.set(token, (scores.get(token) ?? 0) + score);
+  };
+
+  for (const token of titleTokens) addScore(token, 3);
+  for (const token of descriptionTokens) addScore(token, 2);
+  for (const token of domainTokens) {
+    // Skip pure site tokens unless they also exist in title/description.
+    if (!titleTokens.has(token) && !descriptionTokens.has(token)) continue;
+    addScore(token, 1);
+  }
+
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)
+    .slice(0, AUTO_TAG_LIMIT)
+    .map(([token]) => token);
+}
+
 async function fetchMetadata(id: string, url: string) {
   try {
     const res = await fetch(`/api/og?url=${encodeURIComponent(url)}`);
     if (!res.ok) return;
+
     const data = await res.json();
-    
-    if (data.title || data.image) {
-      await updateCapture(id, {
-        ogTitle: data.title,
-        ogImage: data.image,
-        // If the user didn't provide a title, use the fetched one
-        title: get(captures).find(c => c.id === id)?.title === url ? (data.title || url) : undefined
+    const current = get(captures).find((capture) => capture.id === id);
+    if (!current) return;
+
+    const updates: Partial<Capture> = {};
+    const title = typeof data.title === 'string' ? data.title.trim() : '';
+    const image = typeof data.image === 'string' ? data.image.trim() : '';
+    const description = typeof data.description === 'string' ? data.description.trim() : '';
+
+    if (title) updates.ogTitle = title;
+    if (image) updates.ogImage = image;
+
+    if (title && shouldAutoReplaceTitle(current.title, url)) {
+      updates.title = title;
+    }
+
+    if (current.tags.length === 0) {
+      const autoTags = suggestAutoTags({
+        title: title || current.title,
+        description,
+        url,
+        allCaptures: get(captures),
+        existingTags: current.tags
       });
+      if (autoTags.length > 0) {
+        updates.tags = autoTags;
+        for (const tag of autoTags) {
+          await ensureTag(tag);
+        }
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateCapture(id, updates);
     }
   } catch (err) {
     console.error('Failed to fetch metadata:', err);

@@ -1,10 +1,16 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { capturesByStatus, softDeleteCapture, updateCapture } from '$lib/stores/captures';
+  import { capturesByStatus, softDeleteCapture, updateCapture, addCapture, type CreateCaptureInput } from '$lib/stores/captures';
+  import type { Capture, CaptureType } from '$lib/db';
   import CaptureCard from '$lib/components/CaptureCard.svelte';
+  import CaptureModal from '$lib/components/CaptureModal.svelte';
+  import { goto } from '$app/navigation';
 
   const archived = capturesByStatus('archived');
   let visibleIds = $derived($archived.map((capture) => capture.id));
+  let showModal = $state(false);
+  let editingCapture = $state<Capture | null>(null);
+  let initialModalData = $state<any>(null);
 
   async function handleRestore(id: string) {
     await updateCapture(id, { status: 'saved' });
@@ -12,6 +18,45 @@
 
   async function handleDelete(id: string) {
     await softDeleteCapture(id);
+  }
+
+  function openEditModal(capture: Capture) {
+    editingCapture = capture;
+    initialModalData = {
+      type: capture.type,
+      title: capture.title,
+      content: capture.content,
+      sourceUrl: capture.sourceUrl ?? '',
+      collectionId: capture.collectionId ?? null,
+      tags: [...capture.tags]
+    };
+    showModal = true;
+  }
+
+  function handleCardOpen(capture: Capture) {
+    if (capture.type === 'link') {
+      void goto(`/read/${capture.id}`);
+      return;
+    }
+    openEditModal(capture);
+  }
+
+  async function handleSave(data: { type: CaptureType; title: string; content: string; tags: string[]; sourceUrl: string; collectionId: string | null }) {
+    if (editingCapture) {
+      await updateCapture(editingCapture.id, {
+        type: data.type,
+        title: data.title,
+        content: data.content,
+        tags: data.tags,
+        sourceUrl: data.sourceUrl || null,
+        collectionId: data.collectionId ?? null
+      });
+      editingCapture = null;
+      initialModalData = null;
+      return;
+    }
+
+    await addCapture(data as CreateCaptureInput);
   }
 </script>
 
@@ -28,7 +73,14 @@
   {#if $archived.length > 0}
     <div class="grid">
       {#each $archived as capture (capture.id)}
-        <CaptureCard {capture} onDelete={handleDelete} onRestore={handleRestore} {visibleIds} />
+        <CaptureCard
+          {capture}
+          onDelete={handleDelete}
+          onRestore={handleRestore}
+          onEdit={openEditModal}
+          onOpen={handleCardOpen}
+          {visibleIds}
+        />
       {/each}
     </div>
   {:else}
@@ -39,6 +91,8 @@
     </div>
   {/if}
 </div>
+
+<CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
 
 <style>
   .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }

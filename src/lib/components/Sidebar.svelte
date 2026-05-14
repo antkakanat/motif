@@ -7,6 +7,7 @@
   import { activeCaptures } from '$lib/stores/captures';
   import { isProUnlocked } from '$lib/pro';
   import { resolvedTheme } from '$lib/theme';
+  import NavIcon from '$lib/components/NavIcon.svelte';
 
   interface NavItem {
     href: string;
@@ -15,19 +16,19 @@
   }
 
   const mainItems: NavItem[] = [
-    { href: '/', icon: '▦', label: t('nav.allCaptures') }
+    { href: '/', icon: 'all', label: t('nav.allCaptures') }
   ];
 
   const typeItems: NavItem[] = [
-    { href: '/links', icon: '🔗', label: t('nav.links') },
-    { href: '/quotes', icon: '❞', label: t('nav.quotes') },
-    { href: '/notes', icon: '✎', label: t('nav.notes') },
-    { href: '/images', icon: '▣', label: t('nav.images') }
+    { href: '/links', icon: 'link', label: t('nav.links') },
+    { href: '/quotes', icon: 'quote', label: t('nav.quotes') },
+    { href: '/notes', icon: 'note', label: t('nav.notes') },
+    { href: '/images', icon: 'image', label: t('nav.images') }
   ];
 
   const utilityItems: NavItem[] = [
-    { href: '/archived', icon: '⌂', label: t('status.archived') },
-    { href: '/trash', icon: '🗑', label: t('nav.trash') }
+    { href: '/archived', icon: 'archived', label: t('status.archived') },
+    { href: '/trash', icon: 'trash', label: t('nav.trash') }
   ];
 
   let collapsed = $state(false);
@@ -94,7 +95,7 @@
       {/if}
       {#each mainItems as item}
         <a href={item.href} class="nav-item" class:active={isActive(item.href, $page.url.pathname)} title={collapsed ? item.label : undefined}>
-          <span class="nav-icon">{item.icon}</span>
+          <span class="nav-icon"><NavIcon name={item.icon} size={18} /></span>
           {#if !collapsed}
             <span class="nav-label">{item.label}</span>
             <span class="nav-count">{$activeCaptures.length}</span>
@@ -109,7 +110,7 @@
       {/if}
       {#each typeItems as item}
         <a href={item.href} class="nav-item" class:active={isActive(item.href, $page.url.pathname)} title={collapsed ? item.label : undefined}>
-          <span class="nav-icon">{item.icon}</span>
+          <span class="nav-icon"><NavIcon name={item.icon} size={18} /></span>
           {#if !collapsed}<span class="nav-label">{item.label}</span>{/if}
         </a>
       {/each}
@@ -155,7 +156,7 @@
       {#if !collapsed}<p class="group-title">Utility</p>{/if}
       {#each utilityItems as item}
         <a href={item.href} class="nav-item" class:active={isActive(item.href, $page.url.pathname)} title={collapsed ? item.label : undefined}>
-          <span class="nav-icon">{item.icon}</span>
+          <span class="nav-icon"><NavIcon name={item.icon} size={18} /></span>
           {#if !collapsed}<span class="nav-label">{item.label}</span>{/if}
         </a>
       {/each}
@@ -164,7 +165,7 @@
 
   <div class="sidebar-footer">
     <a href="/settings" class="nav-item" class:active={isActive('/settings', $page.url.pathname)} title={collapsed ? t('nav.settings') : undefined}>
-      <span class="nav-icon">⚙</span>
+      <span class="nav-icon"><NavIcon name="settings" size={18} /></span>
       {#if !collapsed}<span class="nav-label">{t('nav.settings')}</span>{/if}
     </a>
     {#if !collapsed}
@@ -296,9 +297,10 @@
 
   .nav-icon {
     width: 24px;
-    text-align: center;
-    font-size: clamp(1.05rem, 0.9vw + 0.65rem, 1.35rem);
-    line-height: 1;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
   }
   .nav-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
