@@ -15,8 +15,18 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'logo-light.png', 'logo-dark.png', 'screenshots/desktop.png', 'screenshots/mobile.png'],
+      registerType: 'prompt',
+      includeAssets: [
+        'favicon.ico', 
+        'favicon-16x16.png', 
+        'favicon-32x32.png', 
+        'apple-touch-icon.png', 
+        'logo-light.png', 
+        'logo-dark.png', 
+        'screenshots/desktop.png', 
+        'screenshots/mobile.png',
+        'offline.html'
+      ],
       manifest: {
         name: 'Motif — Capture every note.',
         short_name: 'Motif',
@@ -65,15 +75,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: '/offline.html',
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
+            urlPattern: /^https:\/\/motif\.byant\.dev\/(|links|quotes|notes|images|trash|settings|collections\/.*)$/,
+            handler: 'NetworkFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'motif-routes',
+              networkTimeoutSeconds: 3,
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                maxEntries: 20
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -81,13 +92,12 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'gstatic-fonts-cache',
+              cacheName: 'motif-fonts',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
               },
               cacheableResponse: {
                 statuses: [0, 200]

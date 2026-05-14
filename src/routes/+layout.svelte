@@ -14,10 +14,14 @@
   import '$lib/theme';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import UpdateToast from '$lib/components/UpdateToast.svelte';
+  import OnlineStatusToast from '$lib/components/OnlineStatusToast.svelte';
   import { pwaInfo } from 'virtual:pwa-info';
 
   let { children } = $props();
   let ready = $state(false);
+  let showUpdateToast = $state(false);
+  let swRegistration = $state<ServiceWorkerRegistration | undefined>(undefined);
 
   // Auto-lock idle timer
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -56,14 +60,17 @@
       const { registerSW } = await import('virtual:pwa-register');
       registerSW({
         immediate: true,
-        onRegistered(registration: ServiceWorkerRegistration | undefined) {
-          void registration;
+        onNeedRefresh: () => {
+          showUpdateToast = true;
+        },
+        onRegistered: (registration: ServiceWorkerRegistration | undefined) => {
+          swRegistration = registration;
           console.log('Motif Service Worker Registered');
         },
-        onRegisterError(error: unknown) {
+        onRegisterError: (error: unknown) => {
           console.error('Service Worker Registration Error:', error);
         }
-      });
+      } as any);
     }
 
     ready = true;
@@ -75,6 +82,13 @@
       await goto(`/lock?redirect=${encodeURIComponent($page.url.pathname)}`);
     }
   });
+
+  function handleUpdate() {
+    if (swRegistration?.waiting) {
+      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    window.location.reload();
+  }
 
   function onKeydown(e: KeyboardEvent) {
     handleKeydown(e);
@@ -125,6 +139,14 @@
 {/if}
 
 <Toast />
+<OnlineStatusToast />
+
+{#if showUpdateToast}
+  <UpdateToast 
+    onUpdate={handleUpdate} 
+    onDismiss={() => showUpdateToast = false} 
+  />
+{/if}
 
 <style>
   .app-shell {
