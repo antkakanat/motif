@@ -1,100 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-
-  interface BeforeInstallPromptEvent extends Event {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-  }
-
-  const DISMISSED_TS_KEY = 'motif_install_dismissed_ts';
-  const INSTALLED_KEY = 'motif_installed';
-  const VISIT_COUNT_KEY = 'motif_install_visit_count';
-  const REAPPEAR_HOURS = 72;
-
-  let deferredPrompt = $state<BeforeInstallPromptEvent | null>(null);
-  let isVisible = $state(false);
-  let isIos = $state(false);
-  let isAndroid = $state(false);
-  let isHuawei = $state(false);
-  let isStandalone = $state(false);
-
-  function checkEligibility() {
-    // 1. If already installed, don't show
-    if (localStorage.getItem(INSTALLED_KEY) === 'true') return;
-    
-    // 2. Check if currently in standalone mode
-    isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                   (window.navigator as any).standalone === true;
-    
-    if (isStandalone) {
-      localStorage.setItem(INSTALLED_KEY, 'true');
-      return;
-    }
-
-    // 3. Check dismissal timestamp
-    const dismissedTs = localStorage.getItem(DISMISSED_TS_KEY);
-    if (dismissedTs) {
-      const hoursSinceDismissal = (Date.now() - parseInt(dismissedTs)) / (1000 * 60 * 60);
-      if (hoursSinceDismissal < REAPPEAR_HOURS) return;
-    }
-
-    // 4. Detect OS
-    const ua = navigator.userAgent.toLowerCase();
-    isIos = /iphone|ipad|ipod/i.test(ua);
-    isAndroid = /android/i.test(ua);
-    isHuawei = /huawei|harmonyos/i.test(ua);
-
-    // 5. Final visibility check
-    // Show if:
-    // - We have the automatic prompt (Android/Desktop)
-    // - OR it's a mobile device (iOS/Android/Huawei) and we're not in standalone mode
-    isVisible = Boolean(deferredPrompt) || ((isIos || isAndroid || isHuawei) && !isStandalone);
-  }
+  import { installBannerVisible, installPrompt, dismissInstallBanner, promptInstall } from '$lib/stores/installPrompt';
 
   function handleDismiss() {
-    localStorage.setItem(DISMISSED_TS_KEY, Date.now().toString());
-    isVisible = false;
+    dismissInstallBanner();
   }
 
   async function handleInstall() {
-    if (!deferredPrompt) return;
-
-    await deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
-    if (choice.outcome === 'accepted') {
-      localStorage.setItem(INSTALLED_KEY, 'true');
-      isVisible = false;
-    }
+    await promptInstall();
   }
-
-  onMount(() => {
-    const previousVisits = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
-    localStorage.setItem(VISIT_COUNT_KEY, String(previousVisits + 1));
-
-    checkEligibility();
-
-    const onBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      deferredPrompt = event as BeforeInstallPromptEvent;
-      checkEligibility();
-    };
-
-    const onAppInstalled = () => {
-      localStorage.setItem(INSTALLED_KEY, 'true');
-      isVisible = false;
-    };
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
-  });
 </script>
 
-{#if isVisible}
+{#if $installBannerVisible}
   <div class="install-card" role="dialog" aria-labelledby="install-title">
     <div class="card-header">
       <div class="logo-mini">
@@ -110,7 +26,7 @@
     </div>
 
     <div class="card-content">
-      {#if isIos}
+      {#if $installPrompt.platform === 'ios'}
         <div class="mobile-steps">
           <div class="step">
             <span class="step-num">1</span>
@@ -127,11 +43,11 @@
             </div>
           </div>
         </div>
-      {:else if deferredPrompt}
+      {:else if $installPrompt.deferredPrompt}
         <button class="install-btn primary" onclick={handleInstall}>
           Install Motif
         </button>
-      {:else if isAndroid || isHuawei}
+      {:else if $installPrompt.platform === 'android' || $installPrompt.platform === 'huawei'}
         <div class="mobile-steps">
           <div class="step">
             <span class="step-num">1</span>

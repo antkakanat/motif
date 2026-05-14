@@ -11,6 +11,7 @@
   import PinModal from '$lib/components/PinModal.svelte';
   import ImportModal from '$lib/components/ImportModal.svelte';
   import { exportData } from '$lib/export';
+  import { installPrompt, nativeInstallReady, initInstallPrompt, promptInstall } from '$lib/stores/installPrompt';
   import { onMount } from 'svelte';
 
   let storageInfo = $state<StorageEstimate | null>(null);
@@ -23,8 +24,11 @@
   let importFile = $state<File | null>(null);
   let fileInput: HTMLInputElement;
   let isExporting = $state(false);
+  let isInstalling = $state(false);
+  let installMessage = $state('');
 
   onMount(async () => {
+    initInstallPrompt({ countVisit: false });
     storageInfo = await getStorageEstimate();
   });
 
@@ -61,6 +65,52 @@
       isExporting = false;
     }
   }
+
+  async function handleInstallApp() {
+    isInstalling = true;
+    installMessage = '';
+
+    try {
+      const outcome = await promptInstall();
+      if (outcome === 'accepted') {
+        installMessage = 'Install started. Motif should appear in your app launcher shortly.';
+      } else if (outcome === 'dismissed') {
+        installMessage = 'Install dismissed. You can try again later from the browser menu.';
+      } else {
+        installMessage = getManualInstallHint();
+      }
+    } finally {
+      isInstalling = false;
+    }
+  }
+
+  function getManualInstallHint(): string {
+    if ($installPrompt.platform === 'ios') {
+      return 'Open Safari Share, then choose Add to Home Screen.';
+    }
+
+    if ($installPrompt.platform === 'android' || $installPrompt.platform === 'huawei') {
+      return 'Open the browser menu, then choose Install app or Add to home screen.';
+    }
+
+    if ($installPrompt.platform === 'desktop') {
+      return 'Use the install icon in the address bar, or the browser menu install option.';
+    }
+
+    return 'Use your browser menu to add Motif to this device.';
+  }
+
+  let installDescription = $derived.by(() => {
+    if ($installPrompt.isInstalled || $installPrompt.isStandalone) {
+      return 'Motif is installed on this device.';
+    }
+
+    if ($nativeInstallReady) {
+      return 'Install Motif for faster access and offline launch.';
+    }
+
+    return getManualInstallHint();
+  });
 
   function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -120,6 +170,33 @@
         </div>
         {#if licenseError}<p class="error-text">{licenseError}</p>{/if}
         {#if licenseSuccess}<p class="success-text">{t('pro.settings.activate.success')}</p>{/if}
+      {/if}
+    </div>
+  </section>
+
+  <!-- Install App -->
+  <section class="section">
+    <h2 class="section-title">Install App</h2>
+    <div class="section-card">
+      <div class="setting-row install-row">
+        <div class="setting-info">
+          <span class="setting-label">Install Motif on this device</span>
+          <p class="setting-hint">{installDescription}</p>
+        </div>
+
+        {#if $installPrompt.isInstalled || $installPrompt.isStandalone}
+          <span class="status-badge installed-badge">Installed</span>
+        {:else if $nativeInstallReady}
+          <button class="btn-primary" onclick={handleInstallApp} disabled={isInstalling}>
+            {isInstalling ? 'Opening...' : 'Install Motif'}
+          </button>
+        {:else}
+          <span class="status-badge manual-badge">Manual install</span>
+        {/if}
+      </div>
+
+      {#if installMessage}
+        <p class="install-message">{installMessage}</p>
       {/if}
     </div>
   </section>
@@ -303,6 +380,14 @@
   .setting-label { font-size:13px; font-weight:500; color:var(--color-text-secondary); display:block; margin-bottom:2px; }
   .setting-hint { font-size: 12px; color: var(--color-text-secondary); margin: 0; opacity: 0.7; }
   .setting-divider { height: 1px; background: var(--color-border); margin: 16px 0; }
+  .status-badge { display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:var(--radius-full); font-size:12px; font-weight:700; white-space:nowrap; }
+  .installed-badge { color:var(--color-accent); background:color-mix(in srgb, var(--color-accent) 14%, transparent); }
+  .manual-badge { color:var(--color-text-secondary); background:color-mix(in srgb, var(--color-text-secondary) 12%, transparent); border:1px solid color-mix(in srgb, var(--color-text-secondary) 18%, transparent); }
+  .install-message { margin:12px 0 0; font-size:12px; color:var(--color-text-secondary); }
+  @media (max-width: 640px) {
+    .install-row { align-items:flex-start; flex-direction:column; }
+    .install-row .btn-primary { width:100%; }
+  }
 
   .pro-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-md); font-size:14px; font-weight:600; margin-bottom:12px; }
   .free-badge { background:var(--color-surface); color:var(--color-text-secondary); border: 1px solid var(--color-border); }

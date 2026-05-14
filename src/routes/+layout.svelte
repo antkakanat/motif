@@ -16,6 +16,7 @@
   import { page } from '$app/stores';
   import UpdateToast from '$lib/components/UpdateToast.svelte';
   import OnlineStatusToast from '$lib/components/OnlineStatusToast.svelte';
+  import { initInstallPrompt } from '$lib/stores/installPrompt';
   import { pwaInfo } from 'virtual:pwa-info';
 
   let { children } = $props();
@@ -50,6 +51,7 @@
   });
 
   onMount(async () => {
+    initInstallPrompt({ countVisit: true });
     await initI18n();
     await loadSettings();
     await loadCaptures();
