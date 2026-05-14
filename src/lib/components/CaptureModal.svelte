@@ -4,6 +4,7 @@
   import { findDuplicateUrl } from '$lib/stores/captures';
   import { collections } from '$lib/stores/collections';
   import { isProUnlocked } from '$lib/pro';
+  import NavIcon from '$lib/components/NavIcon.svelte';
 
   type Tab = CaptureType;
 
@@ -143,11 +144,11 @@
     if (e.key === 'Escape') close();
   }
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: 'link', label: t('capture.addLink'), icon: '🔗' },
-    { key: 'quote', label: t('capture.addQuote'), icon: '❝' },
-    { key: 'note', label: t('capture.addNote'), icon: '✎' },
-    { key: 'image', label: t('capture.addImage'), icon: '◻' }
+  const tabs: { key: Tab; label: string; icon: 'link' | 'quote' | 'note' | 'image' }[] = [
+    { key: 'link', label: t('capture.addLink'), icon: 'link' },
+    { key: 'quote', label: t('capture.addQuote'), icon: 'quote' },
+    { key: 'note', label: t('capture.addNote'), icon: 'note' },
+    { key: 'image', label: t('capture.addImage'), icon: 'image' }
   ];
 
   function handleImageUpload(e: Event) {
@@ -183,7 +184,7 @@
               }
             }}
           >
-            <span class="tab-icon">{tab.icon}</span>
+            <span class="tab-icon"><NavIcon name={tab.icon} size={15} strokeWidth={2} /></span>
             <span class="tab-label">{tab.label}</span>
           </button>
         {/each}
@@ -358,7 +359,11 @@
   }
 
   .tab-icon {
-    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
   }
 
   .tab-label {
