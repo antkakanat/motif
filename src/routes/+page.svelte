@@ -244,7 +244,7 @@
   <div class="page-header">
     <div class="header-left">
       <div class="title-row">
-        <h1 class="page-title">{t('nav.allCaptures')}</h1>
+        <h1 id="page-title" class="page-title">{t('nav.allCaptures')}</h1>
         <span class="capture-count">{displayedCaptures.length}</span>
       </div>
       <span class="privacy-badge">Private by default</span>

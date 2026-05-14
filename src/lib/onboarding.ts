@@ -38,10 +38,10 @@ export async function startOnboarding(): Promise<void> {
     },
     steps: [
       {
-        element: '#btn-new-capture',
+        element: '#page-title',
         popover: {
           title: '👋 Welcome to Motif!',
-          description: 'Save anything here — links, quotes, notes, or images. Click <strong>+ New Capture</strong> to start.',
+          description: 'Your private, offline-first capture tool. Save anything here — links, quotes, notes, or images.',
           side: 'bottom',
           align: 'center'
         }

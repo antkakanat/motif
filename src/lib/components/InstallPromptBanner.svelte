@@ -38,9 +38,6 @@
       if (hoursSinceDismissal < REAPPEAR_HOURS) return;
     }
 
-    const visits = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
-    if (visits < 2) return;
-
     // 4. Detect OS
     const ua = navigator.userAgent.toLowerCase();
     isIos = /iphone|ipad|ipod/i.test(ua);
@@ -132,7 +129,7 @@
         </div>
       {:else if deferredPrompt}
         <button class="install-btn primary" onclick={handleInstall}>
-          Install App
+          Install Motif
         </button>
       {:else if isAndroid || isHuawei}
         <div class="mobile-steps">
@@ -156,25 +153,25 @@
 <style>
   .install-card {
     position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     left: 20px;
     right: 20px;
     max-width: 400px;
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    padding: 16px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    padding: 20px;
     z-index: 1000;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    animation: slideUp 0.4s var(--ease-out);
+    animation: slideUp 0.6s var(--ease-out);
   }
 
   @keyframes slideUp {
-    from { transform: translateY(100px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from { transform: translateY(100%) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
   }
 
   .card-header {
@@ -276,6 +273,15 @@
   }
 
   @media (min-width: 769px) {
-    .install-card { left: 24px; bottom: 24px; }
+    .install-card {
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(100%) scale(0.95); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+    }
   }
 </style>

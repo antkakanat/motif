@@ -28,6 +28,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
     margin: 0 0 14px;
     border-radius: var(--radius-md);
     border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
