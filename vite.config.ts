@@ -8,10 +8,6 @@ export default defineConfig({
     tailwindcss(),
     sveltekit(),
     SvelteKitPWA({
-      kit: {
-        spa: true,
-        adapterFallback: '/'
-      },
       devOptions: {
         enabled: true
       },
@@ -75,22 +71,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallback: '/offline.html',
+        navigateFallback: '/',
+        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/motif\.byant\.dev\/(|links|quotes|notes|images|trash|settings|collections\/.*)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'motif-routes',
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 20
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
             handler: 'CacheFirst',

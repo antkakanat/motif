@@ -150,6 +150,11 @@
     onOpen?.(capture);
   }
 
+  function handleReadClick(e: MouseEvent) {
+    e.stopPropagation();
+    onOpen?.(capture);
+  }
+
   function toggle() {
     if (!isSelectionMode) {
       enterSelectionMode();
@@ -238,7 +243,7 @@
     </div>
     <div class="footer-right">
       {#if capture.type === 'link' && !isSelectionMode}
-        <span class="open-indicator">Open &gt;</span>
+        <button class="read-btn" type="button" onclick={handleReadClick}>Read</button>
       {/if}
       {#if capture.tags.length > 0}
         <div class="card-tags">
@@ -434,11 +439,21 @@
   }
   .footer-status { display:flex; align-items:center; gap:6px; min-width: 0; }
   .footer-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
-  .open-indicator {
+  .read-btn {
+    border: 1px solid color-mix(in srgb, var(--color-primary) 32%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    padding: 4px 9px;
     font-size: 12px;
     font-weight: 600;
     color: var(--color-primary);
     white-space: nowrap;
+    cursor: pointer;
+    font-family: var(--font-sans);
+  }
+  .read-btn:hover {
+    background: var(--color-primary-subtle);
+    border-color: var(--color-primary);
   }
   .card-tags { display:flex; flex-wrap:wrap; gap:4px; }
   .card-tag { padding:2px 8px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-full); font-size:11px; font-weight:500; }

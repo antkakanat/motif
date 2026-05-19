@@ -1,5 +1,10 @@
 declare module 'virtual:pwa-info' {
-  export const pwaInfo: unknown;
+  export const pwaInfo: {
+    webManifest: {
+      href: string;
+      linkTag: string;
+    };
+  } | undefined;
 }
 
 declare module 'virtual:pwa-register' {

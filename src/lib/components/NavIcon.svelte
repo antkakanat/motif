@@ -59,6 +59,9 @@
   {:else if name === 'collections'}
     <path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
     <path d="M3 7V5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2" />
+  {:else if name === 'lock'}
+    <rect x="5" y="10" width="14" height="11" rx="2" />
+    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
   {:else}
     <circle cx="12" cy="12" r="8" />
   {/if}

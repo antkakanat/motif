@@ -149,6 +149,14 @@
     if (e.key === 'Escape') close();
   }
 
+  async function handleCollectionGate(e: Event) {
+    if (unlocked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const allowed = await requestProFeature('collections', 'Collections');
+    if (!allowed) return;
+  }
+
   const tabs: { key: Tab; label: string; icon: 'link' | 'quote' | 'note' | 'image' }[] = [
     { key: 'link', label: t('capture.addLink'), icon: 'link' },
     { key: 'quote', label: t('capture.addQuote'), icon: 'quote' },
@@ -259,22 +267,41 @@
           </div>
         {/if}
 
-        <!-- Collection Selection (Pro Only) -->
-        {#if unlocked && $collections.length > 0}
-          <div class="form-group">
+        <!-- Collection Selection -->
+        <div class="form-group" class:gated={!unlocked}>
+          <div class="form-label-row">
             <label class="form-label" for="collection-select">{t('collections.addToCollection')}</label>
+            {#if !unlocked}
+              <button class="pro-chip" type="button" onclick={handleCollectionGate} aria-label="Collections is a Pro feature">
+                <NavIcon name="lock" size={12} strokeWidth={2.2} />
+                Pro feature
+              </button>
+            {/if}
+          </div>
+          <div class="select-lock-wrapper">
             <select
               id="collection-select"
               class="form-select"
               bind:value={collectionId}
+              aria-disabled={!unlocked}
+              onpointerdown={handleCollectionGate}
+              onfocus={handleCollectionGate}
             >
               <option value={null}>{t('collections.none')}</option>
               {#each $collections as col}
                 <option value={col.id}>{col.name}</option>
               {/each}
+              {#if $collections.length === 0}
+                <option value={null} disabled>{t('collections.empty')}</option>
+              {/if}
             </select>
+            {#if !unlocked}
+              <button class="select-gate" type="button" onclick={handleCollectionGate} aria-label="Unlock Collections">
+                <NavIcon name="lock" size={12} strokeWidth={2.2} />
+              </button>
+            {/if}
           </div>
-        {/if}
+        </div>
 
         <!-- Tags -->
         <div class="tags-section">
@@ -564,6 +591,67 @@
 
   .form-select:focus {
     border-color: var(--color-primary);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .form-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+
+  .pro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font-sans);
+  }
+
+  .select-lock-wrapper {
+    position: relative;
+  }
+
+  .form-group.gated .form-select {
+    padding-right: 44px;
+    color: var(--color-text-secondary);
+    background: color-mix(in srgb, var(--color-surface) 90%, var(--color-primary) 10%);
+    cursor: pointer;
+  }
+
+  .select-gate {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+    padding: 4px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font-sans);
   }
 
   /* Footer */
