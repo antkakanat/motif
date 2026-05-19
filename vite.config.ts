@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 export default defineConfig({
+  esbuild: {
+    logOverride: { 'duplicate-object-key': 'silent' }
+  },
   plugins: [
     tailwindcss(),
     sveltekit(),
