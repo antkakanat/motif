@@ -1,7 +1,9 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { type CaptureType, type Capture } from '$lib/db';
-  import { findDuplicateUrl } from '$lib/stores/captures';
+  import { findDuplicateUrl, runOcrOnCapture } from '$lib/stores/captures';
+  import { activeOcrRuns } from '$lib/ocr';
+  import { db } from '$lib/db';
   import { collections } from '$lib/stores/collections';
   import { isProUnlocked, requestProFeature } from '$lib/pro';
   import NavIcon from '$lib/components/NavIcon.svelte';
@@ -15,15 +17,20 @@
     tags: string[];
     sourceUrl: string;
     collectionId: string | null;
+    ocrText?: string | null;
+    ocrStatus?: string;
   }
 
   export interface InitialData {
+    id?: string;
     type?: CaptureType;
     title?: string;
     content?: string;
     sourceUrl?: string;
     collectionId?: string | null;
     tags?: string[];
+    ocrText?: string | null;
+    ocrStatus?: string;
   }
 
   let {
@@ -42,6 +49,19 @@
 
   let activeTab = $state<Tab>('link');
 
+  let title = $state('');
+  let content = $state('');
+  let sourceUrl = $state('');
+  let tagInput = $state('');
+  let tags = $state<string[]>([]);
+  let collectionId = $state<string | null>(null);
+  let duplicateCapture = $state<Capture | undefined>(undefined);
+  
+  let ocrText = $state<string | null>(null);
+  let ocrStatus = $state<string | undefined>(undefined);
+
+  let isOcrRunning = $derived(initialData?.id ? $activeOcrRuns.has(initialData.id) : false);
+
   $effect(() => {
     if (open) {
       if (initialData) {
@@ -51,20 +71,30 @@
         sourceUrl = initialData.sourceUrl || '';
         collectionId = initialData.collectionId || null;
         tags = initialData.tags ? [...initialData.tags] : [];
+        ocrText = initialData.ocrText || null;
+        ocrStatus = initialData.ocrStatus || undefined;
         tagInput = '';
       } else {
         activeTab = defaultTab;
+        ocrText = null;
+        ocrStatus = undefined;
         reset();
       }
     }
   });
-  let title = $state('');
-  let content = $state('');
-  let sourceUrl = $state('');
-  let tagInput = $state('');
-  let tags = $state<string[]>([]);
-  let collectionId = $state<string | null>(null);
-  let duplicateCapture = $state<Capture | undefined>(undefined);
+
+  let prevIsOcrRunning = false;
+  $effect(() => {
+    if (initialData?.id && !isOcrRunning && prevIsOcrRunning) {
+      db.captures.get(initialData.id).then(cap => {
+        if (cap) {
+          ocrText = cap.ocrText || null;
+          ocrStatus = cap.ocrStatus;
+        }
+      });
+    }
+    prevIsOcrRunning = isOcrRunning;
+  });
 
   $effect(() => {
     if (activeTab === 'link' && content.trim()) {
@@ -111,10 +141,30 @@
       content: content.trim(),
       tags: [...tags],
       sourceUrl: sourceUrl.trim(),
-      collectionId
+      collectionId,
+      ocrText,
+      ocrStatus
     });
 
     close();
+  }
+
+  async function triggerManualOcr() {
+    if (!initialData?.id) {
+      const { performOCR } = await import('$lib/ocr');
+      ocrStatus = 'processing';
+      try {
+        const text = await performOCR(content);
+        ocrText = text || null;
+        ocrStatus = 'done';
+      } catch (err: any) {
+        console.error('Manual OCR failed:', err);
+        ocrStatus = 'failed';
+      }
+      return;
+    }
+
+    await runOcrOnCapture(initialData.id, content, true);
   }
 
   function addTag() {
@@ -251,7 +301,48 @@
           <div class="image-upload">
             {#if content}
               <img src={content} alt="Preview" class="image-preview" />
-              <button class="btn-text" onclick={() => content = ''}>Remove</button>
+              <button class="btn-text" onclick={() => { content = ''; ocrText = null; ocrStatus = undefined; }}>Remove</button>
+
+              <div class="ocr-modal-panel">
+                <div class="ocr-modal-header">
+                  <span class="ocr-modal-title">Extracted Text (OCR)</span>
+                  {#if isOcrRunning || ocrStatus === 'processing'}
+                    <span class="ocr-modal-status processing">Processing...</span>
+                  {:else if ocrStatus === 'done'}
+                    <span class="ocr-modal-status done">Completed</span>
+                  {:else if ocrStatus === 'failed'}
+                    <span class="ocr-modal-status failed">Failed</span>
+                  {:else if ocrStatus === 'skipped'}
+                    <span class="ocr-modal-status skipped">Skipped</span>
+                  {/if}
+                </div>
+
+                {#if isOcrRunning || ocrStatus === 'processing'}
+                  <div class="ocr-modal-loading">
+                    <div class="spinner"></div>
+                    <span>Extracting text from image locally...</span>
+                  </div>
+                {:else}
+                  <textarea
+                    class="input textarea ocr-textarea"
+                    placeholder="No text extracted yet or extraction skipped. Click 'Extract Text' to run OCR."
+                    bind:value={ocrText}
+                    rows="4"
+                  ></textarea>
+
+                  <div class="ocr-actions-row">
+                    {#if !ocrStatus || ocrStatus === 'skipped' || ocrStatus === 'failed'}
+                      <button class="btn-small" type="button" onclick={triggerManualOcr}>
+                        Extract Text
+                      </button>
+                    {:else if ocrStatus === 'done'}
+                      <button class="btn-small" type="button" onclick={triggerManualOcr}>
+                        Re-scan Image
+                      </button>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
             {:else}
               <label class="upload-area">
                 <input
@@ -692,5 +783,114 @@
   .btn-ghost:hover {
     background: var(--color-surface);
     color: var(--color-text);
+  }
+
+  /* OCR Modal Panel Styles */
+  .ocr-modal-panel {
+    margin-top: 12px;
+    background: color-mix(in srgb, var(--color-border) 20%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .ocr-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ocr-modal-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .ocr-modal-status {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+  }
+
+  .ocr-modal-status.processing {
+    color: var(--color-primary);
+    background: var(--color-primary-subtle);
+  }
+
+  .ocr-modal-status.done {
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  }
+
+  .ocr-modal-status.failed {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  }
+
+  .ocr-modal-status.skipped {
+    color: var(--color-text-secondary);
+    background: color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+  }
+
+  .ocr-modal-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+  }
+
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--color-border);
+    border-radius: 50%;
+    border-top-color: var(--color-primary);
+    animation: ocr-spin 0.8s linear infinite;
+  }
+
+  @keyframes ocr-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .ocr-textarea {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    background: var(--color-surface);
+  }
+
+  .ocr-actions-row {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .btn-small:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
   }
 </style>

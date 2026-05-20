@@ -10,7 +10,8 @@
     enterSelectionMode
   } from '$lib/stores/selection';
   import { collections } from '$lib/stores/collections';
-  import { updateCapture } from '$lib/stores/captures';
+  import { updateCapture, runOcrOnCapture } from '$lib/stores/captures';
+  import { activeOcrRuns } from '$lib/ocr';
   import { requestProFeature } from '$lib/pro';
 
   let {
@@ -35,6 +36,7 @@
   let showCollectionPicker = $state(false);
   let isSelected = $derived($selectedIds.has(capture.id));
   let isSelectionMode = $derived($selectionMode === 'selection');
+  let isOcrRunning = $derived($activeOcrRuns.has(capture.id));
 
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
   let longPressTriggered = $state(false);
@@ -220,7 +222,32 @@
     {#if capture.type === 'image' && capture.content}
       <div class="image-shell">
         <img src={capture.content} alt={capture.title} class="card-image" loading="lazy" />
+        {#if isOcrRunning}
+          <div class="ocr-overlay">
+            <div class="spinner"></div>
+            <span>Extracting text...</span>
+          </div>
+        {/if}
       </div>
+
+      {#if isOcrRunning}
+        <div class="ocr-running-indicator">
+          <span class="pulse-dot"></span>
+          <span>Running OCR...</span>
+        </div>
+      {:else if capture.ocrStatus === 'failed'}
+        <div class="ocr-failed-row" onclick={(e) => e.stopPropagation()}>
+          <span class="ocr-failed-text">⚠ Text extraction failed</span>
+          <button class="ocr-retry-btn" onclick={(e) => { e.stopPropagation(); runOcrOnCapture(capture.id, capture.content, true); }}>
+            Retry
+          </button>
+        </div>
+      {:else if capture.ocrText}
+        <p class="ocr-excerpt">
+          <span class="ocr-doc-icon">📄</span>
+          <span class="ocr-text-content">{truncate(capture.ocrText, 80)}</span>
+        </p>
+      {/if}
     {:else if capture.type === 'quote'}
       <blockquote class="card-quote">"{truncate(capture.content, 220)}"</blockquote>
     {:else if capture.type === 'link'}
@@ -538,5 +565,125 @@
 
   :global([data-theme='dark']) .card-footer {
     border-top-color: color-mix(in srgb, var(--color-border) 88%, transparent);
+  }
+
+  /* OCR Styles */
+  .ocr-running-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-primary);
+    margin-top: 6px;
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-primary);
+    border-radius: 50%;
+    animation: ocr-pulse 1.5s infinite ease-in-out;
+  }
+
+  @keyframes ocr-pulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.5; }
+  }
+
+  .ocr-failed-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--color-danger) 30%, transparent);
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .ocr-failed-text {
+    font-size: 12px;
+    color: var(--color-danger);
+    font-weight: 500;
+  }
+
+  .ocr-retry-btn {
+    background: var(--color-danger);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background var(--duration-fast);
+  }
+
+  .ocr-retry-btn:hover {
+    background: color-mix(in srgb, var(--color-danger) 85%, black);
+  }
+
+  .ocr-excerpt {
+    font-size: 12.5px;
+    color: var(--color-text-secondary);
+    margin: 6px 0 0;
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--color-border) 25%, transparent);
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    border-left: 2px solid var(--color-primary);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .ocr-doc-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .ocr-text-content {
+    word-break: break-word;
+    font-style: italic;
+    opacity: 0.9;
+  }
+
+  .image-shell {
+    position: relative;
+  }
+
+  .ocr-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: ocr-spin 0.8s linear infinite;
+  }
+
+  @keyframes ocr-spin {
+    to { transform: rotate(360deg); }
   }
 </style>

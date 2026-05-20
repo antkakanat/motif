@@ -6,6 +6,10 @@ import { writable, derived, get } from 'svelte/store';
 import { db, generateId, now, type Capture, type CaptureType, type CaptureStatus } from '$lib/db';
 import { rebuildSearchIndex } from '$lib/search';
 import { isOnboardingDone, completeOnboarding } from '$lib/onboarding';
+import { isProUnlocked } from '$lib/pro';
+import { settings } from '$lib/stores/settings';
+import { activeOcrRuns } from '$lib/ocr';
+import { showToast } from '$lib/stores/toast';
 
 // ── Reactive store ──
 
@@ -85,6 +89,7 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     createdAt: now(),
     updatedAt: now(),
     ocrText: null,
+    ocrStatus: input.type === 'image' ? 'pending' : undefined,
     sourceUrl: input.sourceUrl ?? null
   };
 
@@ -108,6 +113,11 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     void fetchMetadata(capture.id, capture.content);
   }
 
+  // Trigger OCR in background for images
+  if (capture.type === 'image') {
+    void runOcrOnCapture(capture.id, capture.content);
+  }
+
   return capture;
 }
 
@@ -121,6 +131,70 @@ export async function updateCapture(id: string, changes: Partial<Capture>): Prom
     list.map((c) => (c.id === id ? { ...c, ...updates } : c))
   );
   rebuildSearchIndex(get(captures));
+
+  // Rerun OCR if the image content itself is updated
+  if (changes.content) {
+    const updated = get(captures).find((c) => c.id === id);
+    if (updated && updated.type === 'image') {
+      void runOcrOnCapture(id, changes.content, true); // Force rerun on direct updates
+    }
+  }
+}
+
+// ── Run OCR ──
+
+export async function runOcrOnCapture(id: string, imageSrc: string, force = false): Promise<void> {
+  const isPro = isProUnlocked();
+  const autoOcrEnabled = get(settings).autoOcr;
+
+  if (!isPro) {
+    await updateCapture(id, { ocrStatus: 'skipped' });
+    return;
+  }
+
+  if (!autoOcrEnabled && !force) {
+    await updateCapture(id, { ocrStatus: 'skipped' });
+    return;
+  }
+
+  // Update in-memory set for loading animation
+  activeOcrRuns.update((set) => {
+    const next = new Set(set);
+    next.add(id);
+    return next;
+  });
+
+  // Mark as processing in IndexedDB
+  await updateCapture(id, { ocrStatus: 'processing', ocrError: undefined });
+
+  try {
+    const { performOCR } = await import('$lib/ocr');
+    const text = await performOCR(imageSrc);
+
+    await updateCapture(id, {
+      ocrText: text || null,
+      ocrStatus: 'done',
+      ocrUpdatedAt: now(),
+      ocrError: undefined
+    });
+
+    if (text && text.trim()) {
+      showToast('Text successfully extracted from image!');
+    }
+  } catch (err: any) {
+    console.error('Failed to run OCR on capture:', err);
+    await updateCapture(id, {
+      ocrStatus: 'failed',
+      ocrError: err?.message || String(err)
+    });
+    showToast('Image text extraction failed.');
+  } finally {
+    activeOcrRuns.update((set) => {
+      const next = new Set(set);
+      next.delete(id);
+      return next;
+    });
+  }
 }
 
 // ── Soft Delete (Trash) ──

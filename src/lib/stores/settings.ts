@@ -14,10 +14,9 @@ const KEYS = {
   LICENSE_KEY: 'licenseKey',
   PRO_ACTIVE: 'proActive',
   ONBOARDING_DONE: 'onboardingDone',
-  PIN_LENGTH: 'pinLength'
+  PIN_LENGTH: 'pinLength',
+  AUTO_OCR: 'autoOcr'
 } as const;
-
-
 
 // ── Settings store ──
 
@@ -29,6 +28,7 @@ interface SettingsState {
   proActive: boolean;
   onboardingDone: boolean;
   pinLength: number;
+  autoOcr: boolean;
 }
 
 const defaultSettings: SettingsState = {
@@ -38,7 +38,8 @@ const defaultSettings: SettingsState = {
   licenseKey: null,
   proActive: false,
   onboardingDone: false,
-  pinLength: 4
+  pinLength: 4,
+  autoOcr: true
 };
 
 export const settings = writable<SettingsState>({ ...defaultSettings });
@@ -73,6 +74,9 @@ export async function loadSettings(): Promise<void> {
         break;
       case KEYS.PIN_LENGTH:
         state.pinLength = parseInt(row.value, 10) || 4;
+        break;
+      case KEYS.AUTO_OCR:
+        state.autoOcr = row.value === 'true';
         break;
     }
   }
@@ -144,6 +148,11 @@ export async function deactivateLicense(): Promise<void> {
   await db.settings.delete(KEYS.LICENSE_KEY);
   await saveSetting(KEYS.PRO_ACTIVE, 'false');
   settings.update((s) => ({ ...s, licenseKey: null, proActive: false }));
+}
+
+export async function setAutoOcr(enabled: boolean): Promise<void> {
+  await saveSetting(KEYS.AUTO_OCR, String(enabled));
+  settings.update((s) => ({ ...s, autoOcr: enabled }));
 }
 
 // ── Onboarding ──

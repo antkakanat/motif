@@ -22,6 +22,9 @@ export interface Capture {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   ocrText: string | null;
+  ocrStatus?: 'pending' | 'processing' | 'done' | 'failed' | 'skipped';
+  ocrError?: string;
+  ocrUpdatedAt?: string;
   sourceUrl: string | null;
 }
 

@@ -89,6 +89,32 @@ export default defineConfig({
                 statuses: [0, 200]
               }
             }
+          },
+          {
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'motif-cdn-assets',
+              expiration: {
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/tessdata\.projectnaptha\.com/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'motif-tesseract-models',
+              expiration: {
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }

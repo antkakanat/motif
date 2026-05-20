@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { t } from '$lib/i18n';
   import { capturesByType, addCapture, softDeleteCapture, updateCapture, type CreateCaptureInput } from '$lib/stores/captures';
   import { clearSelection, selectAll } from '$lib/stores/selection';
@@ -32,7 +32,10 @@
       content: capture.content,
       sourceUrl: capture.sourceUrl ?? '',
       collectionId: capture.collectionId ?? null,
-      tags: [...capture.tags]
+      tags: [...capture.tags],
+      id: capture.id,
+      ocrText: capture.ocrText,
+      ocrStatus: capture.ocrStatus
     };
     showModal = true;
   }
@@ -50,14 +53,16 @@
     ]);
   });
 
-  async function handleSave(data: CreateCaptureInput) {
+  async function handleSave(data: any) {
     if (editingCapture) {
       await updateCapture(editingCapture.id, {
         title: data.title,
         content: data.content,
         tags: data.tags ?? [],
         sourceUrl: data.sourceUrl ?? null,
-        collectionId: data.collectionId ?? null
+        collectionId: data.collectionId ?? null,
+        ocrText: data.ocrText,
+        ocrStatus: data.ocrStatus
       });
       editingCapture = null;
       initialModalData = null;

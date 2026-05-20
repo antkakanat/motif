@@ -1,7 +1,9 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { t } from '$lib/i18n';
   import { CHECKOUT_URLS } from '$lib/constants';
-  import { settings, setAutoLockMinutes } from '$lib/stores/settings';
+  import { settings, setAutoLockMinutes, setAutoOcr } from '$lib/stores/settings';
+  import { db } from '$lib/db';
+  import { runOcrOnCapture } from '$lib/stores/captures';
   import { themeMode, setTheme, type ThemeMode } from '$lib/theme';
   import { getStorageEstimate, type StorageEstimate } from '$lib/storage';
   import { changelog } from '$lib/changelog';
@@ -28,9 +30,48 @@
   let isInstalling = $state(false);
   let installMessage = $state('');
 
+  let skippedImagesCount = $state(0);
+  let isScanningSkipped = $state(false);
+  let scannedProgress = $state(0);
+
+  async function countSkippedImages() {
+    try {
+      skippedImagesCount = await db.captures
+        .filter(c => c.type === 'image' && (c.ocrStatus === 'skipped' || !c.ocrStatus))
+        .count();
+    } catch (err) {
+      console.error('Failed to count skipped images:', err);
+    }
+  }
+
+  async function handleAutoOcrToggle(enabled: boolean) {
+    await setAutoOcr(enabled);
+  }
+
+  async function handleScanAllSkipped() {
+    isScanningSkipped = true;
+    scannedProgress = 0;
+    try {
+      const skipped = await db.captures
+        .filter(c => c.type === 'image' && (c.ocrStatus === 'skipped' || !c.ocrStatus))
+        .toArray();
+      
+      for (const capture of skipped) {
+        await runOcrOnCapture(capture.id, capture.content, true);
+        scannedProgress++;
+      }
+      await countSkippedImages();
+    } catch (err) {
+      console.error('Failed scanning skipped images:', err);
+    } finally {
+      isScanningSkipped = false;
+    }
+  }
+
   onMount(async () => {
     initInstallPrompt({ countVisit: false });
     storageInfo = await getStorageEstimate();
+    await countSkippedImages();
   });
 
   async function handleThemeChange(mode: ThemeMode) {
@@ -257,6 +298,42 @@
     </div>
   </section>
 
+  <!-- Privacy Controls -->
+  <section class="section">
+    <h2 class="section-title">Privacy Controls</h2>
+    <div class="section-card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Auto-extract text from images (OCR)</span>
+          <p class="setting-hint">Runs locally on your device. Never uploaded anywhere.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked={$settings.autoOcr} onchange={(e) => handleAutoOcrToggle((e.target as HTMLInputElement).checked)} />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      {#if skippedImagesCount > 0}
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Pending OCR Scans</span>
+            <p class="setting-hint">
+              {#if isScanningSkipped}
+                Scanning: {scannedProgress} / {skippedImagesCount} completed...
+              {:else}
+                There are {skippedImagesCount} image captures without extracted text.
+              {/if}
+            </p>
+          </div>
+          <button class="btn-primary" onclick={handleScanAllSkipped} disabled={isScanningSkipped}>
+            {isScanningSkipped ? 'Scanning...' : 'Scan all now'}
+          </button>
+        </div>
+      {/if}
+    </div>
+  </section>
+
   <!-- Storage -->
   <section class="section">
     <h2 class="section-title">{t('settings.storage')}</h2>
@@ -464,5 +541,47 @@
 
   .link-muted:hover {
     color: var(--color-primary);
+  }
+
+  /* Switch / Toggle styles */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-border);
+    transition: .3s;
+    border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+  }
+  input:checked + .slider {
+    background-color: var(--color-primary);
+  }
+  input:checked + .slider:before {
+    transform: translateX(20px);
   }
 </style>

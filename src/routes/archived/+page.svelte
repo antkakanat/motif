@@ -29,7 +29,10 @@
       content: capture.content,
       sourceUrl: capture.sourceUrl ?? '',
       collectionId: capture.collectionId ?? null,
-      tags: [...capture.tags]
+      tags: [...capture.tags],
+      id: capture.id,
+      ocrText: capture.ocrText,
+      ocrStatus: capture.ocrStatus
     };
     showModal = true;
   }
@@ -44,7 +47,7 @@
     openEditModal(capture);
   }
 
-  async function handleSave(data: { type: CaptureType; title: string; content: string; tags: string[]; sourceUrl: string; collectionId: string | null }) {
+  async function handleSave(data: any) {
     if (editingCapture) {
       await updateCapture(editingCapture.id, {
         type: data.type,
@@ -52,7 +55,9 @@
         content: data.content,
         tags: data.tags,
         sourceUrl: data.sourceUrl || null,
-        collectionId: data.collectionId ?? null
+        collectionId: data.collectionId ?? null,
+        ocrText: data.ocrText,
+        ocrStatus: data.ocrStatus
       });
       editingCapture = null;
       initialModalData = null;
