@@ -10,6 +10,14 @@ import { isProUnlocked } from '$lib/pro';
 import { settings } from '$lib/stores/settings';
 import { activeOcrRuns } from '$lib/ocr';
 import { showToast } from '$lib/stores/toast';
+import { indexCaptureSingle } from '$lib/stores/semanticSearch';
+import {
+  sessionKey,
+  isLocked,
+  encryptCapture,
+  decryptCapturesList,
+  encryptText
+} from '$lib/encryption';
 
 // ── Reactive store ──
 
@@ -52,8 +60,29 @@ export async function loadCaptures() {
   isLoading.set(true);
   try {
     const all = await db.captures.toArray();
-    captures.set(all);
-    rebuildSearchIndex(all);
+    const settingsState = get(settings);
+
+    if (settingsState.dbEncrypted) {
+      const key = get(sessionKey);
+      if (!key) {
+        // App database is encrypted but locked!
+        isLocked.set(true);
+        captures.set([]);
+        rebuildSearchIndex([]);
+      } else {
+        // Decrypt on the fly into RAM
+        const decrypted = await decryptCapturesList(all, key);
+        captures.set(decrypted);
+        rebuildSearchIndex(decrypted);
+        isLocked.set(false);
+      }
+    } else {
+      captures.set(all);
+      rebuildSearchIndex(all);
+      isLocked.set(false);
+    }
+  } catch (err) {
+    console.error('Failed to load captures:', err);
   } finally {
     isLoading.set(false);
   }
@@ -93,7 +122,15 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     sourceUrl: input.sourceUrl ?? null
   };
 
-  await db.captures.add(capture);
+  // Encrypt record if database is encrypted
+  let dbRecord = { ...capture };
+  if (get(settings).dbEncrypted) {
+    const key = get(sessionKey);
+    if (key) {
+      dbRecord = await encryptCapture(capture, key);
+    }
+  }
+  await db.captures.add(dbRecord);
 
   // Ensure tags exist in tags table
   for (const tagName of capture.tags) {
@@ -118,6 +155,11 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     void runOcrOnCapture(capture.id, capture.content);
   }
 
+  // Trigger Semantic Search indexing if enabled
+  if (get(settings).autoAiSearch) {
+    void indexCaptureSingle(capture);
+  }
+
   return capture;
 }
 
@@ -125,7 +167,23 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
 
 export async function updateCapture(id: string, changes: Partial<Capture>): Promise<void> {
   const updates = { ...changes, updatedAt: now() };
-  await db.captures.update(id, updates);
+  
+  let dbUpdates: Partial<Capture> = { ...updates };
+  if (get(settings).dbEncrypted) {
+    const key = get(sessionKey);
+    if (key) {
+      const encryptedUpdates: Partial<Capture> = { ...updates };
+      if (updates.title) encryptedUpdates.title = 'enc:' + await encryptText(updates.title, key);
+      if (updates.content) encryptedUpdates.content = 'enc:' + await encryptText(updates.content, key);
+      if (updates.ocrText) encryptedUpdates.ocrText = 'enc:' + await encryptText(updates.ocrText, key);
+      if (updates.tags) {
+        const serializedTags = JSON.stringify(updates.tags);
+        encryptedUpdates.tags = ['enc_json:' + await encryptText(serializedTags, key)];
+      }
+      dbUpdates = encryptedUpdates;
+    }
+  }
+  await db.captures.update(id, dbUpdates);
 
   captures.update((list) =>
     list.map((c) => (c.id === id ? { ...c, ...updates } : c))
@@ -137,6 +195,14 @@ export async function updateCapture(id: string, changes: Partial<Capture>): Prom
     const updated = get(captures).find((c) => c.id === id);
     if (updated && updated.type === 'image') {
       void runOcrOnCapture(id, changes.content, true); // Force rerun on direct updates
+    }
+  }
+
+  // Re-index for semantic search if AI search is active
+  if (get(settings).autoAiSearch) {
+    const updated = get(captures).find((c) => c.id === id);
+    if (updated) {
+      void indexCaptureSingle(updated);
     }
   }
 }
@@ -215,12 +281,20 @@ export async function restoreCapture(id: string): Promise<void> {
   captures.update((list) =>
     list.map((c) => (c.id === id ? { ...c, ...updates } : c))
   );
+
+  if (get(settings).autoAiSearch) {
+    const updated = get(captures).find((c) => c.id === id);
+    if (updated) {
+      void indexCaptureSingle(updated);
+    }
+  }
 }
 
 // ── Permanent Delete ──
 
 export async function permanentDeleteCapture(id: string): Promise<void> {
   await db.captures.delete(id);
+  await db.embeddings.delete(id);
   captures.update((list) => list.filter((c) => c.id !== id));
   rebuildSearchIndex(get(captures));
 }
@@ -239,6 +313,7 @@ export async function purgeOldTrash(): Promise<number> {
 
   const ids = stale.map((c) => c.id);
   await db.captures.bulkDelete(ids);
+  await db.embeddings.bulkDelete(ids);
   captures.update((list) => list.filter((c) => !ids.includes(c.id)));
   rebuildSearchIndex(get(captures));
   return ids.length;
@@ -472,19 +547,30 @@ export async function bulkSoftDelete(ids: string[]): Promise<void> {
 
 export async function bulkUpdateTags(ids: string[], newTags: string[], additive = true): Promise<void> {
   const t = now();
+  const allCaptures = get(captures);
+  const key = get(sessionKey);
+  const isEncrypted = get(settings).dbEncrypted;
+
   await db.transaction('rw', db.captures, db.tags, async () => {
-    const items = await db.captures.where('id').anyOf(ids).toArray();
-    
-    for (const item of items) {
+    for (const id of ids) {
+      const item = allCaptures.find(c => c.id === id);
+      if (!item) continue;
+
       let tags: string[];
       if (additive) {
         tags = [...new Set([...item.tags, ...newTags])];
       } else {
         tags = [...new Set(newTags)];
       }
-      
-      await db.captures.update(item.id, { tags, updatedAt: t });
-      
+
+      let dbTags = tags;
+      if (isEncrypted && key) {
+        const serializedTags = JSON.stringify(tags);
+        dbTags = ['enc_json:' + await encryptText(serializedTags, key)];
+      }
+
+      await db.captures.update(id, { tags: dbTags, updatedAt: t });
+
       // Ensure tags exist
       for (const tag of newTags) {
         await ensureTag(tag);
@@ -492,7 +578,18 @@ export async function bulkUpdateTags(ids: string[], newTags: string[], additive 
     }
   });
 
-  await loadCaptures(); // Easiest way to sync complex tag updates
+  // Apply updates to the Svelte memory store
+  captures.update((list) =>
+    list.map((c) => {
+      if (ids.includes(c.id)) {
+        const tags = additive ? [...new Set([...c.tags, ...newTags])] : [...new Set(newTags)];
+        return { ...c, tags, updatedAt: t };
+      }
+      return c;
+    })
+  );
+  
+  rebuildSearchIndex(get(captures));
 }
 
 export async function bulkMoveToCollection(ids: string[], collectionId: string | null): Promise<void> {

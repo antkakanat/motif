@@ -47,6 +47,14 @@ export interface AppSettings {
   value: string;
 }
 
+export interface CaptureEmbedding {
+  captureId: string;
+  embedding: number[];
+  model: string;        // 'Xenova/all-MiniLM-L6-v2' — full ID required
+  textHash: string;     // hash of the text that was embedded
+  updatedAt: string;
+}
+
 // ────────────────────────────────────────────────
 // Database Definition
 // ────────────────────────────────────────────────
@@ -56,6 +64,7 @@ export class MotifDB extends Dexie {
   collections!: EntityTable<Collection, 'id'>;
   tags!: EntityTable<Tag, 'id'>;
   settings!: EntityTable<AppSettings, 'key'>;
+  embeddings!: EntityTable<CaptureEmbedding, 'captureId'>;
 
   constructor() {
     super('motif');
@@ -71,6 +80,11 @@ export class MotifDB extends Dexie {
     // Schema v2 — added sourceUrl index for duplicate detection
     this.version(2).stores({
       captures: 'id, type, status, *tags, collectionId, isTrashed, createdAt, updatedAt, sourceUrl',
+    });
+
+    // Schema v3 — added embeddings table for Phase D Local AI Search
+    this.version(3).stores({
+      embeddings: 'captureId',
     });
   }
 }

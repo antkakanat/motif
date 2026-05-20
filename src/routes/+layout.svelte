@@ -20,6 +20,7 @@
   import { initInstallPrompt } from '$lib/stores/installPrompt';
   import { pwaInfo } from 'virtual:pwa-info';
   import { isForceFreeMode } from '$lib/pro';
+  import { sessionKey } from '$lib/encryption';
 
   let { children } = $props();
   let ready = $state(false);
@@ -33,10 +34,15 @@
   function resetIdleTimer() {
     if (idleTimer) clearTimeout(idleTimer);
     const autoLockMinutes = $settings.autoLockMinutes;
-    if (autoLockMinutes === 0 || !$settings.pinHash) return; // Never or no PIN set
+    if (autoLockMinutes === 0) return; // Never
+    if (!$settings.pinHash && !$settings.dbEncrypted) return; // No locks active
     idleTimer = setTimeout(() => {
       const isOnLock = $page.url.pathname === '/lock';
       if (!isOnLock) {
+        if ($settings.dbEncrypted) {
+          sessionKey.set(null);
+          void loadCaptures();
+        }
         goto(`/lock?redirect=${encodeURIComponent($page.url.pathname)}`);
       }
     }, autoLockMinutes * 60 * 1000);
@@ -80,10 +86,11 @@
 
     ready = true;
 
-    // Redirect to lock if PIN is set and we're not already on the lock route
+    // Redirect to lock if PIN is set or database is encrypted and locked, and we're not already on the lock route
     const hasPIN = $settings.pinHash;
+    const isDbLocked = $settings.dbEncrypted && !$sessionKey;
     const isLock = $page.url.pathname === '/lock';
-    if (hasPIN && !isLock) {
+    if ((hasPIN || isDbLocked) && !isLock) {
       await goto(`/lock?redirect=${encodeURIComponent($page.url.pathname)}`);
     }
   });

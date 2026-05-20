@@ -26,6 +26,7 @@
 		"vite": "^8.0.7"
 	},
 	"dependencies": {
+		"@huggingface/transformers": "^4.2.0",
 		"@mozilla/readability": "^0.6.0",
 		"@tiptap/core": "^3.23.1",
 		"@tiptap/pm": "^3.23.1",

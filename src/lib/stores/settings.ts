@@ -15,7 +15,9 @@ const KEYS = {
   PRO_ACTIVE: 'proActive',
   ONBOARDING_DONE: 'onboardingDone',
   PIN_LENGTH: 'pinLength',
-  AUTO_OCR: 'autoOcr'
+  AUTO_OCR: 'autoOcr',
+  AUTO_AI_SEARCH: 'autoAiSearch',
+  DB_ENCRYPTED: 'dbEncrypted'
 } as const;
 
 // ── Settings store ──
@@ -29,6 +31,8 @@ interface SettingsState {
   onboardingDone: boolean;
   pinLength: number;
   autoOcr: boolean;
+  autoAiSearch: boolean;
+  dbEncrypted: boolean;
 }
 
 const defaultSettings: SettingsState = {
@@ -39,7 +43,9 @@ const defaultSettings: SettingsState = {
   proActive: false,
   onboardingDone: false,
   pinLength: 4,
-  autoOcr: true
+  autoOcr: true,
+  autoAiSearch: false,
+  dbEncrypted: false
 };
 
 export const settings = writable<SettingsState>({ ...defaultSettings });
@@ -77,6 +83,12 @@ export async function loadSettings(): Promise<void> {
         break;
       case KEYS.AUTO_OCR:
         state.autoOcr = row.value === 'true';
+        break;
+      case KEYS.AUTO_AI_SEARCH:
+        state.autoAiSearch = row.value === 'true';
+        break;
+      case KEYS.DB_ENCRYPTED:
+        state.dbEncrypted = row.value === 'true';
         break;
     }
   }
@@ -153,6 +165,16 @@ export async function deactivateLicense(): Promise<void> {
 export async function setAutoOcr(enabled: boolean): Promise<void> {
   await saveSetting(KEYS.AUTO_OCR, String(enabled));
   settings.update((s) => ({ ...s, autoOcr: enabled }));
+}
+
+export async function setAutoAiSearch(enabled: boolean): Promise<void> {
+  await saveSetting(KEYS.AUTO_AI_SEARCH, String(enabled));
+  settings.update((s) => ({ ...s, autoAiSearch: enabled }));
+}
+
+export async function setDbEncrypted(enabled: boolean): Promise<void> {
+  await saveSetting(KEYS.DB_ENCRYPTED, String(enabled));
+  settings.update((s) => ({ ...s, dbEncrypted: enabled }));
 }
 
 // ── Onboarding ──

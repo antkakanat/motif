@@ -9,12 +9,20 @@
   import type { CaptureType, CaptureStatus, Capture } from '$lib/db';
   import { registerShortcuts } from '$lib/shortcuts';
   import { startOnboarding } from '$lib/onboarding';
-  import { settings } from '$lib/stores/settings';
+  import { settings, setAutoAiSearch } from '$lib/stores/settings';
   import { showToast } from '$lib/stores/toast';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { requestProFeature } from '$lib/pro';
+  import {
+    modelLoadingState,
+    downloadProgress,
+    backfillProgress,
+    isBackfilling,
+    cancelBackfill,
+    semanticSearchQuery
+  } from '$lib/stores/semanticSearch';
 
   let showModal = $state(false);
   let searchQuery = $state('');
@@ -24,6 +32,10 @@
   let initialModalData = $state<any>(null);
   let editingCapture = $state<Capture | null>(null);
   let lastHandledParamSignature = $state('');
+
+  let isAiSearchActive = $state(false);
+  let showAiOptInModal = $state(false);
+  let aiSearchScores = $state<Record<string, number>>({});
 
   function openNewCapture() {
     editingCapture = null;
@@ -171,13 +183,43 @@
     void goto('/', { replaceState: true });
   }
 
-  function handleSearch() {
-    if (searchQuery.trim()) {
-      searchResults = search(searchQuery);
-    } else {
+  async function handleSearch() {
+    const query = searchQuery.trim();
+    if (!query) {
       searchResults = [];
+      aiSearchScores = {};
+      return;
+    }
+
+    if (isAiSearchActive && $settings.autoAiSearch && $modelLoadingState === 'ready') {
+      const results = await semanticSearchQuery(query);
+      searchResults = results.map(r => ({ id: r.id, score: r.score }));
+      const scoresMap: Record<string, number> = {};
+      for (const r of results) {
+        scoresMap[r.id] = r.score;
+      }
+      aiSearchScores = scoresMap;
+    } else {
+      searchResults = search(query);
+      aiSearchScores = {};
     }
   }
+
+  async function toggleAiSearch() {
+    if (!$settings.autoAiSearch) {
+      showAiOptInModal = true;
+      return;
+    }
+    isAiSearchActive = !isAiSearchActive;
+    await handleSearch();
+  }
+
+  // Watch settings & loading state to auto-activate semantic search
+  $effect(() => {
+    if ($settings.autoAiSearch && $modelLoadingState === 'ready') {
+      isAiSearchActive = true;
+    }
+  });
 
   // Compute displayed captures
   let displayedCaptures = $derived.by(() => {
@@ -277,8 +319,17 @@
         oninput={handleSearch}
       />
       {#if searchQuery}
-        <button class="search-clear" onclick={() => { searchQuery = ''; searchResults = []; }}>✕</button>
+        <button class="search-clear" onclick={() => { searchQuery = ''; searchResults = []; aiSearchScores = {}; }}>✕</button>
       {/if}
+      <button
+        type="button"
+        class="ai-search-toggle"
+        class:active={isAiSearchActive && $settings.autoAiSearch}
+        onclick={toggleAiSearch}
+        title={t('search.aiToggle')}
+      >
+        ✨
+      </button>
     </div>
     <div class="filters">
       <select class="filter-select" bind:value={filterType}>
@@ -298,12 +349,43 @@
     </div>
   </div>
 
+  <!-- AI Status Banner -->
+  {#if isAiSearchActive && $settings.autoAiSearch}
+    {#if $modelLoadingState === 'loading'}
+      <div class="ai-status-banner glass">
+        <div class="status-left">
+          <span class="spinner">⏳</span>
+          <span class="status-text">{t('search.aiDownloading', { progress: $downloadProgress })}</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" style="width: {$downloadProgress}%"></div>
+        </div>
+      </div>
+    {:else if $isBackfilling}
+      <div class="ai-status-banner glass">
+        <div class="status-left">
+          <span class="pulse-dot"></span>
+          <span class="status-text">
+            {t('search.aiIndexing', { done: $backfillProgress.done, total: $backfillProgress.total })} ({$backfillProgress.percent}%)
+          </span>
+        </div>
+        <div class="status-right">
+          <div class="progress-bar-container mini">
+            <div class="progress-bar-fill" style="width: {$backfillProgress.percent}%"></div>
+          </div>
+          <button class="btn-cancel-indexing" onclick={cancelBackfill}>[Cancel]</button>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
   <!-- Capture Grid -->
   {#if displayedCaptures.length > 0}
     <div class="capture-grid">
       {#each displayedCaptures as capture (capture.id)}
         <CaptureCard 
           {capture} 
+          searchScore={aiSearchScores[capture.id]}
           onDelete={handleDelete}
           onArchive={handleArchive}
           onEdit={openEditModal}
@@ -332,6 +414,43 @@
 
 <!-- Modal -->
 <CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
+
+<!-- AI Search Opt-In Modal -->
+{#if showAiOptInModal}
+  <div class="modal-backdrop" onclick={() => showAiOptInModal = false} role="presentation">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="modal scale-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div class="ai-modal-content">
+        <div class="ai-modal-header">
+          <span class="ai-modal-sparkles">✨</span>
+          <h2>{t('search.aiModalTitle')}</h2>
+        </div>
+        
+        <p class="ai-modal-body">
+          {t('search.aiModalBody')}
+        </p>
+        
+        <div class="ai-modal-privacy-card">
+          <span class="privacy-icon">🛡️</span>
+          <span class="privacy-text">{t('search.aiModalSafe')}</span>
+        </div>
+
+        <div class="ai-modal-actions">
+          <button class="btn-cancel" onclick={() => showAiOptInModal = false}>
+            {t('search.aiModalCancel')}
+          </button>
+          <button class="btn-enable-ai" onclick={async () => {
+            showAiOptInModal = false;
+            await setAutoAiSearch(true);
+            isAiSearchActive = true;
+          }}>
+            {t('search.aiModalEnable')}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Bulk Action Bar -->
 <BulkActionBar {visibleIds} />
@@ -385,4 +504,200 @@
   .btn-empty { display:flex; align-items:center; gap:6px; padding:10px 24px; background:var(--color-primary); color:white; border:none; border-radius:var(--radius-md); font-size:0.875rem; font-weight:500; cursor:pointer; transition:all var(--duration-fast) var(--ease-out); font-family:var(--font-sans); }
   .btn-empty:hover { background:var(--color-primary-hover); }
 
+  /* AI Search Styles */
+  .ai-search-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 6px;
+    margin-left: 6px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    transition: all var(--duration-fast) var(--ease-out);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ai-search-toggle:hover {
+    color: var(--color-primary);
+    background: rgba(91, 78, 214, 0.08);
+    transform: scale(1.08);
+  }
+  .ai-search-toggle.active {
+    color: #10b981;
+    text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    animation: pulse-glow 2s infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(16,185,129,0.2)); }
+    50% { transform: scale(1.08); filter: drop-shadow(0 0 6px rgba(16,185,129,0.6)); }
+  }
+
+  .ai-status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    margin-top: 12px;
+    margin-bottom: 8px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .status-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .spinner {
+    animation: rotate 1.5s linear infinite;
+    display: inline-block;
+  }
+  @keyframes rotate {
+    100% { transform: rotate(360deg); }
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    animation: pulse-dot-anim 1.5s infinite;
+  }
+  @keyframes pulse-dot-anim {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+  .progress-bar-container {
+    flex: 1;
+    min-width: 100px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  .progress-bar-container.mini {
+    width: 80px;
+    flex: none;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), #10b981);
+    transition: width var(--duration-fast) ease;
+    border-radius: var(--radius-full);
+  }
+  .status-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .btn-cancel-indexing {
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: background var(--duration-fast);
+  }
+  .btn-cancel-indexing:hover {
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  .ai-modal-content {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .ai-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ai-modal-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+  }
+  .ai-modal-sparkles {
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #10b981, var(--color-primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .ai-modal-body {
+    font-size: 0.93rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+  .ai-modal-privacy-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.18);
+    border-radius: var(--radius-md);
+  }
+  .privacy-icon {
+    font-size: 1.1rem;
+  }
+  .privacy-text {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #10b981;
+  }
+  .ai-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .btn-cancel {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--duration-fast);
+  }
+  .btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .btn-enable-ai {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--color-primary), #10b981);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--duration-fast);
+    box-shadow: 0 4px 12px rgba(91, 78, 214, 0.2);
+  }
+  .btn-enable-ai:hover {
+    opacity: 0.95;
+    box-shadow: 0 4px 16px rgba(91, 78, 214, 0.35);
+    transform: translateY(-1px);
+  }
 </style>

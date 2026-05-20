@@ -4,6 +4,15 @@
   import { resolvedTheme } from '$lib/theme';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { db } from '$lib/db';
+  import {
+    sessionKey,
+    isLocked,
+    deriveKey,
+    checkVerification,
+    decryptText
+  } from '$lib/encryption';
+  import { loadCaptures } from '$lib/stores/captures';
 
   // Mode: 'unlock' | 'set' | 'change' | 'confirm'
   let mode = $state<'unlock' | 'set' | 'change' | 'confirm'>('unlock');
@@ -12,6 +21,10 @@
   let error = $state('');
   let shake = $state(false);
   let isProcessing = $state(false);
+
+  // DB Encryption States
+  let dbPassword = $state('');
+  let showPassword = $state(false);
 
   const MAX_DIGITS = 6;
   const MIN_DIGITS = 4;
@@ -82,6 +95,75 @@
     }
   }
 
+  async function handleDbUnlock() {
+    if (!dbPassword.trim()) {
+      triggerError('Please enter your password or recovery phrase');
+      return;
+    }
+
+    isProcessing = true;
+    error = '';
+
+    try {
+      const saltRecord = await db.settings.get('dbEncryptionSalt');
+      const recoverySaltRecord = await db.settings.get('dbRecoverySalt');
+      const encryptedMasterKeyByPassword = await db.settings.get('encryptedMasterKeyByPassword');
+      const encryptedMasterKeyByRecovery = await db.settings.get('encryptedMasterKeyByRecovery');
+      const verificationRecord = await db.settings.get('encryptionVerification');
+
+      if (!saltRecord || !verificationRecord || !encryptedMasterKeyByPassword) {
+        triggerError('Database encryption metadata missing. Reset is required.');
+        return;
+      }
+
+      const cleanInput = dbPassword.trim();
+      const isRecovery = cleanInput.split(/\s+/).length === 12;
+
+      let masterKeyHex = '';
+      if (isRecovery) {
+        if (!recoverySaltRecord || !encryptedMasterKeyByRecovery) {
+          triggerError('Recovery phrase is not supported or missing metadata.');
+          return;
+        }
+        const recoverySalt = new Uint8Array(recoverySaltRecord.value.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+        const derivationKey = await deriveKey(cleanInput.toLowerCase(), recoverySalt);
+        masterKeyHex = await decryptText(encryptedMasterKeyByRecovery.value, derivationKey);
+      } else {
+        const salt = new Uint8Array(saltRecord.value.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+        const derivationKey = await deriveKey(cleanInput, salt);
+        masterKeyHex = await decryptText(encryptedMasterKeyByPassword.value, derivationKey);
+      }
+
+      // Convert masterKeyHex to raw CryptoKey
+      const rawKeyBytes = new Uint8Array(masterKeyHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+      const masterKey = await crypto.subtle.importKey(
+        'raw',
+        rawKeyBytes,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+
+      const isValid = await checkVerification(verificationRecord.value, masterKey);
+      if (isValid) {
+        sessionKey.set(masterKey);
+        isLocked.set(false);
+        await loadCaptures();
+        
+        dbPassword = '';
+        const redirect = $page.url.searchParams.get('redirect') ?? '/';
+        await goto(redirect);
+      } else {
+        triggerError(isRecovery ? 'Invalid recovery phrase' : 'Incorrect database password');
+      }
+    } catch (err) {
+      console.error('Db unlock failed:', err);
+      triggerError('Incorrect password or recovery phrase');
+    } finally {
+      isProcessing = false;
+    }
+  }
+
   function triggerError(msg: string) {
     error = msg;
     pin = '';
@@ -90,6 +172,7 @@
   }
 
   function handleKeypad(e: KeyboardEvent) {
+    if ($settings.dbEncrypted && !$sessionKey && mode === 'unlock') return; // Handled by standard input form
     if (e.key >= '0' && e.key <= '9') addDigit(e.key);
     else if (e.key === 'Backspace') deleteDigit();
     else if (e.key === 'Enter' && pin.length >= MIN_DIGITS) void handleSubmit();
@@ -98,6 +181,9 @@
   const digits = ['1','2','3','4','5','6','7','8','9','✓','0','⌫'];
 
   function getTitle(): string {
+    if ($settings.dbEncrypted && !$sessionKey && mode === 'unlock') {
+      return t('settings.encryptionTitle') || 'Database Locked';
+    }
     if (mode === 'set') return t('settings.pinSet');
     if (mode === 'change') return 'Enter new PIN';
     if (mode === 'confirm') return t('settings.pinConfirm');
@@ -105,6 +191,9 @@
   }
 
   function getSubtitle(): string {
+    if ($settings.dbEncrypted && !$sessionKey && mode === 'unlock') {
+      return 'Enter your master password or 12-word recovery phrase';
+    }
     if (mode === 'set' || mode === 'change') return 'Enter a 4–6 digit PIN';
     if (mode === 'confirm') return 'Enter your PIN again to confirm';
     return t('lock.subtitle');
@@ -124,59 +213,93 @@
   <h1 class="lock-title">{getTitle()}</h1>
   <p class="lock-subtitle">{getSubtitle()}</p>
 
-  <!-- PIN dots -->
-  <div class="pin-dots" class:shake>
-    {#each Array($settings.pinLength) as _, i}
-      <div
-        class="dot"
-        class:filled={i < pin.length}
-        class:error={!!error}
-      ></div>
-    {/each}
-  </div>
-
-  <!-- Error message -->
-  {#if error}
-    <p class="error-msg fade-in">{error}</p>
-  {:else}
-    <p class="error-msg"></p>
-  {/if}
-
-  <!-- Numeric keypad -->
-  <div class="keypad" role="group" aria-label="PIN keypad">
-    {#each digits as digit}
-      {#if digit === ''}
-        <div class="key-spacer"></div>
-      {:else if digit === '⌫'}
-        <button
-          class="key key-delete"
-          onclick={deleteDigit}
-          aria-label="Delete"
+  {#if $settings.dbEncrypted && !$sessionKey && mode === 'unlock'}
+    <!-- Password Unlock Form -->
+    <form onsubmit={(e) => { e.preventDefault(); void handleDbUnlock(); }} class="db-unlock-form" class:shake>
+      <div class="password-input-wrapper">
+        <input
+          type={showPassword ? "text" : "password"}
+          class="input db-password-input"
+          placeholder={t('settings.encryptionPasswordPlaceholder') || 'Enter password or 12-word phrase...'}
+          bind:value={dbPassword}
           disabled={isProcessing}
-        >
-          ⌫
-        </button>
-      {:else if digit === '✓'}
+        />
         <button
-          class="key key-submit"
-          onclick={handleSubmit}
-          aria-label="Submit"
-          disabled={isProcessing || pin.length < MIN_DIGITS}
+          type="button"
+          class="password-toggle-btn"
+          onclick={() => showPassword = !showPassword}
+          aria-label="Toggle password visibility"
         >
-          ✓
+          {showPassword ? '👁' : '👁‍🗨'}
         </button>
+      </div>
+
+      <!-- Error message -->
+      {#if error}
+        <p class="error-msg fade-in">{error}</p>
       {:else}
-        <button
-          class="key"
-          onclick={() => addDigit(digit)}
-          disabled={isProcessing}
-          aria-label={digit}
-        >
-          {digit}
-        </button>
+        <p class="error-msg"></p>
       {/if}
-    {/each}
-  </div>
+
+      <button type="submit" class="btn-primary db-unlock-btn" disabled={isProcessing}>
+        {isProcessing ? 'Decrypting...' : 'Unlock Database'}
+      </button>
+    </form>
+  {:else}
+    <!-- PIN dots -->
+    <div class="pin-dots" class:shake>
+      {#each Array($settings.pinLength) as _, i}
+        <div
+          class="dot"
+          class:filled={i < pin.length}
+          class:error={!!error}
+        ></div>
+      {/each}
+    </div>
+
+    <!-- Error message -->
+    {#if error}
+      <p class="error-msg fade-in">{error}</p>
+    {:else}
+      <p class="error-msg"></p>
+    {/if}
+
+    <!-- Numeric keypad -->
+    <div class="keypad" role="group" aria-label="PIN keypad">
+      {#each digits as digit}
+        {#if digit === ''}
+          <div class="key-spacer"></div>
+        {:else if digit === '⌫'}
+          <button
+            class="key key-delete"
+            onclick={deleteDigit}
+            aria-label="Delete"
+            disabled={isProcessing}
+          >
+            ⌫
+          </button>
+        {:else if digit === '✓'}
+          <button
+            class="key key-submit"
+            onclick={handleSubmit}
+            aria-label="Submit"
+            disabled={isProcessing || pin.length < MIN_DIGITS}
+          >
+            ✓
+          </button>
+        {:else}
+          <button
+            class="key"
+            onclick={() => addDigit(digit)}
+            disabled={isProcessing}
+            aria-label={digit}
+          >
+            {digit}
+          </button>
+        {/if}
+      {/each}
+    </div>
+  {/if}
 
   <!-- Forgot PIN (unlock mode only) -->
   {#if mode === 'unlock'}
@@ -229,6 +352,8 @@
     color: var(--color-text-secondary);
     margin: 0 0 32px;
     text-align: center;
+    max-width: 320px;
+    line-height: 1.4;
   }
 
   /* PIN dot indicators */
@@ -238,7 +363,7 @@
     margin-bottom: 8px;
   }
 
-  .pin-dots.shake {
+  .pin-dots.shake, .db-unlock-form.shake {
     animation: shake 0.5s var(--ease-out);
   }
 
@@ -343,6 +468,88 @@
     height: 72px;
   }
 
+  /* DB Unlock Form Styles */
+  .db-unlock-form {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .password-input-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .db-password-input {
+    width: 100%;
+    padding: 14px 44px 14px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text);
+    font-size: 14px;
+    outline: none;
+    transition: all var(--duration-fast) var(--ease-out);
+    font-family: var(--font-sans);
+  }
+
+  .db-password-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity var(--duration-fast);
+  }
+
+  .password-toggle-btn:hover {
+    opacity: 1;
+  }
+
+  .db-unlock-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    font-family: var(--font-sans);
+  }
+
+  .db-unlock-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 85%, black);
+    transform: translateY(-1px);
+  }
+
+  .db-unlock-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .db-unlock-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   /* Footer */
   .lock-footer {
     margin-top: 40px;
@@ -366,3 +573,4 @@
     line-height: 1.5;
   }
 </style>
+

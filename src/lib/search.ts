@@ -44,6 +44,11 @@ miniSearch = createIndex();
 
 // ── Rebuild from full capture list ──
 
+// CRITICAL SECURITY ENFORCEMENT:
+// When database encryption is enabled, the MiniSearch index must always be
+// rebuilt purely in-memory from decrypted captures that reside only in RAM.
+// The index must NEVER be persisted to localStorage or any other persistent disk.
+// On app lock or window close, this volatile index is immediately discarded.
 export function rebuildSearchIndex(captures: Capture[]): void {
   miniSearch = createIndex();
   const searchable = captures.filter((c) => !c.isTrashed);

@@ -16,6 +16,32 @@
   import { installPrompt, nativeInstallReady, initInstallPrompt, promptInstall } from '$lib/stores/installPrompt';
   import { onMount } from 'svelte';
   import { requestProFeature } from '$lib/pro';
+  import {
+    sessionKey,
+    rewriteTotal,
+    rewriteDone,
+    isRewriting,
+    generateRecoveryPhrase,
+    deriveKey,
+    encryptText,
+    decryptText,
+    encryptCapture,
+    createVerification,
+    checkVerification
+  } from '$lib/encryption';
+  import { loadCaptures, captures } from '$lib/stores/captures';
+  import {
+    modelLoadingState,
+    downloadProgress,
+    isBackfilling,
+    backfillProgress,
+    initWorker,
+    startBackfillQueue,
+    cancelBackfill
+  } from '$lib/stores/semanticSearch';
+  import { setDbEncrypted, setAutoAiSearch } from '$lib/stores/settings';
+  import { showToast } from '$lib/stores/toast';
+  import { get } from 'svelte/store';
 
   let storageInfo = $state<StorageEstimate | null>(null);
   let licenseKey = $state('');
@@ -33,6 +59,214 @@
   let skippedImagesCount = $state(0);
   let isScanningSkipped = $state(false);
   let scannedProgress = $state(0);
+
+  // AI Search states & handlers
+  async function handleAiSearchToggle(enabled: boolean) {
+    if (enabled) {
+      if (get(modelLoadingState) !== 'ready') {
+        initWorker();
+      }
+      await setAutoAiSearch(true);
+    } else {
+      await setAutoAiSearch(false);
+      if (get(isBackfilling)) {
+        cancelBackfill();
+      }
+    }
+  }
+
+  async function handleReindex() {
+    await startBackfillQueue(true);
+  }
+
+  // Encryption states & handlers
+  let showEncryptSetupModal = $state(false);
+  let showDecryptConfirmModal = $state(false);
+  let showRecoveryPhraseModal = $state(false);
+
+  let encryptPassword = $state('');
+  let encryptConfirmPassword = $state('');
+  let decryptPassword = $state('');
+  let generatedPhrase = $state('');
+  let phraseCopied = $state(false);
+  let encryptionError = $state('');
+  let decryptionError = $state('');
+
+  function handleEncryptionToggleClick() {
+    if ($settings.dbEncrypted) {
+      showDecryptConfirmModal = true;
+      decryptPassword = '';
+      decryptionError = '';
+    } else {
+      showEncryptSetupModal = true;
+      encryptPassword = '';
+      encryptConfirmPassword = '';
+      encryptionError = '';
+    }
+  }
+
+  async function handleEnableEncryption() {
+    encryptionError = '';
+    const pwd = encryptPassword.trim();
+    if (pwd.length < 8) {
+      encryptionError = 'Password must be at least 8 characters long.';
+      return;
+    }
+    if (pwd !== encryptConfirmPassword.trim()) {
+      encryptionError = 'Passwords do not match.';
+      return;
+    }
+
+    try {
+      // 1. Generate phrase
+      generatedPhrase = generateRecoveryPhrase();
+
+      // 2. Generate master key
+      const masterKey = await crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+      const rawMasterKey = await crypto.subtle.exportKey('raw', masterKey);
+      const rawMasterKeyHex = Array.from(new Uint8Array(rawMasterKey))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      // 3. Derive password key and encrypt master key
+      const passwordSalt = crypto.getRandomValues(new Uint8Array(16));
+      const passwordSaltHex = Array.from(passwordSalt)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const passwordDerivationKey = await deriveKey(pwd, passwordSalt);
+      const encryptedMasterKeyByPassword = await encryptText(rawMasterKeyHex, passwordDerivationKey);
+
+      // 4. Derive recovery phrase key and encrypt master key
+      const recoverySalt = crypto.getRandomValues(new Uint8Array(16));
+      const recoverySaltHex = Array.from(recoverySalt)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const recoveryDerivationKey = await deriveKey(generatedPhrase, recoverySalt);
+      const encryptedMasterKeyByRecovery = await encryptText(rawMasterKeyHex, recoveryDerivationKey);
+
+      // 5. Create verification
+      const verification = await createVerification(masterKey);
+
+      // 6. Rewrite database
+      isRewriting.set(true);
+      const capturesList = await db.captures.toArray();
+      rewriteTotal.set(capturesList.length);
+      rewriteDone.set(0);
+
+      for (const capture of capturesList) {
+        const encrypted = await encryptCapture(capture, masterKey);
+        await db.captures.put(encrypted);
+        rewriteDone.update(n => n + 1);
+      }
+
+      // 7. Save settings to DB
+      await db.settings.put({ key: 'dbEncryptionSalt', value: passwordSaltHex });
+      await db.settings.put({ key: 'dbRecoverySalt', value: recoverySaltHex });
+      await db.settings.put({ key: 'encryptedMasterKeyByPassword', value: encryptedMasterKeyByPassword });
+      await db.settings.put({ key: 'encryptedMasterKeyByRecovery', value: encryptedMasterKeyByRecovery });
+      await db.settings.put({ key: 'encryptionVerification', value: verification });
+
+      // 8. Update stores
+      await setDbEncrypted(true);
+      sessionKey.set(masterKey);
+      await loadCaptures();
+
+      // 9. Transition modals
+      showEncryptSetupModal = false;
+      showRecoveryPhraseModal = true;
+      showToast('✓ Local encryption successfully enabled');
+    } catch (err) {
+      console.error('Failed to enable encryption:', err);
+      encryptionError = 'An error occurred during database encryption.';
+    } finally {
+      isRewriting.set(false);
+    }
+  }
+
+  async function handleDisableEncryption() {
+    decryptionError = '';
+    const pwd = decryptPassword.trim();
+    if (!pwd) {
+      decryptionError = 'Password is required.';
+      return;
+    }
+
+    try {
+      const saltRecord = await db.settings.get('dbEncryptionSalt');
+      const verificationRecord = await db.settings.get('encryptionVerification');
+      const encryptedMasterKeyByPassword = await db.settings.get('encryptedMasterKeyByPassword');
+
+      if (!saltRecord || !verificationRecord || !encryptedMasterKeyByPassword) {
+        decryptionError = 'Encryption metadata missing.';
+        return;
+      }
+
+      const salt = new Uint8Array(saltRecord.value.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+      const derivationKey = await deriveKey(pwd, salt);
+      const masterKeyHex = await decryptText(encryptedMasterKeyByPassword.value, derivationKey);
+
+      // Verify masterKey
+      const rawKeyBytes = new Uint8Array(masterKeyHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+      const masterKey = await crypto.subtle.importKey(
+        'raw',
+        rawKeyBytes,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+
+      const isValid = await checkVerification(verificationRecord.value, masterKey);
+      if (!isValid) {
+        decryptionError = 'Incorrect password.';
+        return;
+      }
+
+      // Rewrite database back to plaintext
+      isRewriting.set(true);
+      const plainCaptures = get(captures);
+      rewriteTotal.set(plainCaptures.length);
+      rewriteDone.set(0);
+
+      for (const capture of plainCaptures) {
+        await db.captures.put(capture);
+        rewriteDone.update(n => n + 1);
+      }
+
+      // Clean up metadata
+      await db.settings.delete('dbEncryptionSalt');
+      await db.settings.delete('dbRecoverySalt');
+      await db.settings.delete('encryptedMasterKeyByPassword');
+      await db.settings.delete('encryptedMasterKeyByRecovery');
+      await db.settings.delete('encryptionVerification');
+
+      await setDbEncrypted(false);
+      sessionKey.set(null);
+      await loadCaptures();
+
+      showDecryptConfirmModal = false;
+      decryptPassword = '';
+      showToast('✓ Local encryption successfully disabled');
+    } catch (err) {
+      console.error('Failed to disable encryption:', err);
+      decryptionError = 'Incorrect password or decryption failure.';
+    } finally {
+      isRewriting.set(false);
+    }
+  }
+
+  async function copyPhrase() {
+    try {
+      await navigator.clipboard.writeText(generatedPhrase);
+      phraseCopied = true;
+      setTimeout(() => { phraseCopied = false; }, 2000);
+    } catch (err) {
+      console.error('Failed to copy phrase:', err);
+    }
+  }
 
   async function countSkippedImages() {
     try {
@@ -298,6 +532,33 @@
     </div>
   </section>
 
+  <!-- Local Database Encryption -->
+  <section class="section">
+    <h2 class="section-title">{t('settings.encryptionTitle') || 'AES-256 Database Encryption'}</h2>
+    <div class="section-card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Local Database Encryption</span>
+          <p class="setting-hint">
+            {#if $settings.dbEncrypted}
+              Enabled. All text fields (titles, notes, quotes, tags) are encrypted with zero-knowledge AES-256-GCM.
+            {:else}
+              Disabled. Text fields are stored in plaintext in local IndexedDB.
+            {/if}
+          </p>
+        </div>
+        <button
+          class="btn-outline"
+          class:danger-outline={$settings.dbEncrypted}
+          onclick={handleEncryptionToggleClick}
+          disabled={$isRewriting}
+        >
+          {$settings.dbEncrypted ? t('settings.encryptionDisable') || 'Disable Encryption' : t('settings.encryptionEnable') || 'Enable Encryption'}
+        </button>
+      </div>
+    </div>
+  </section>
+
   <!-- Privacy Controls -->
   <section class="section">
     <h2 class="section-title">Privacy Controls</h2>
@@ -328,6 +589,71 @@
           </div>
           <button class="btn-primary" onclick={handleScanAllSkipped} disabled={isScanningSkipped}>
             {isScanningSkipped ? 'Scanning...' : 'Scan all now'}
+          </button>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  <!-- AI Semantic Search -->
+  <section class="section">
+    <h2 class="section-title">{t('settings.aiSearchTitle') || 'AI Semantic Search'}</h2>
+    <div class="section-card">
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">{t('settings.aiSearchEnable') || 'Enable AI Search'}</span>
+          <p class="setting-hint">
+            {#if $modelLoadingState === 'loading'}
+              Downloading AI model... {$downloadProgress}%
+            {:else if $modelLoadingState === 'ready'}
+              Offline AI model loaded and ready.
+            {:else if $modelLoadingState === 'error'}
+              Failed to load AI model.
+            {:else}
+              Enables offline semantic search based on meaning and context.
+            {/if}
+          </p>
+        </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            checked={$settings.autoAiSearch}
+            disabled={$modelLoadingState === 'loading'}
+            onchange={(e) => handleAiSearchToggle((e.target as HTMLInputElement).checked)}
+          />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      {#if $isBackfilling}
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">AI Indexing Progress</span>
+            <p class="setting-hint">
+              Indexing captures: {$backfillProgress.done} / {$backfillProgress.total} ({$backfillProgress.percent}%)
+            </p>
+            <div class="progress-bar-container" style="margin-top: 8px;">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: {$backfillProgress.percent}%"></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-outline danger-outline" onclick={cancelBackfill}>
+            Cancel
+          </button>
+        </div>
+      {/if}
+
+      {#if $settings.autoAiSearch && $modelLoadingState === 'ready'}
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">{t('settings.aiSearchReindex') || 'Re-index all captures'}</span>
+            <p class="setting-hint">{t('settings.aiSearchReindexDesc') || 'Regenerates AI search index for all captures.'}</p>
+          </div>
+          <button class="btn-outline" onclick={handleReindex} disabled={$isBackfilling}>
+            {$isBackfilling ? 'Indexing...' : 'Re-index All'}
           </button>
         </div>
       {/if}
@@ -455,7 +781,325 @@
 <PinModal bind:open={showPinModal} />
 <ImportModal bind:open={showImportModal} bind:file={importFile} />
 
+<!-- Encryption Setup Modal -->
+{#if showEncryptSetupModal}
+  <div class="modal-backdrop">
+    <div class="modal-container glassmorphic">
+      <h3 class="modal-title">{t('settings.encryptionTitle') || 'Enable Database Encryption'}</h3>
+      <p class="modal-desc">
+        Create a password to encrypt your database locally. This password is zero-knowledge: it is never uploaded and cannot be reset.
+      </p>
+
+      <div class="modal-form">
+        <div class="form-group">
+          <label class="form-label">{t('settings.encryptionPassword')}</label>
+          <input
+            type="password"
+            class="input"
+            placeholder={t('settings.encryptionPasswordPlaceholder') || 'Enter at least 8 characters...'}
+            bind:value={encryptPassword}
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input
+            type="password"
+            class="input"
+            placeholder="Confirm your password..."
+            bind:value={encryptConfirmPassword}
+          />
+        </div>
+
+        {#if encryptionError}
+          <p class="error-text">{encryptionError}</p>
+        {/if}
+
+        <div class="modal-actions">
+          <button class="btn-outline" onclick={() => showEncryptSetupModal = false}>Cancel</button>
+          <button class="btn-primary" onclick={handleEnableEncryption}>Enable Encryption</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Decrypt Confirmation Modal -->
+{#if showDecryptConfirmModal}
+  <div class="modal-backdrop">
+    <div class="modal-container glassmorphic">
+      <h3 class="modal-title">{t('settings.encryptionWarningTitle') || 'Disable encryption?'}</h3>
+      <p class="modal-desc">
+        {t('settings.encryptionWarningDesc') || 'This will decrypt all your captures and may take a moment for large libraries.'}
+      </p>
+
+      <div class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Enter Password to Confirm</label>
+          <input
+            type="password"
+            class="input"
+            placeholder="Enter your database password..."
+            bind:value={decryptPassword}
+          />
+        </div>
+
+        {#if decryptionError}
+          <p class="error-text">{decryptionError}</p>
+        {/if}
+
+        <div class="modal-actions">
+          <button class="btn-outline" onclick={() => showDecryptConfirmModal = false}>Cancel</button>
+          <button class="btn-primary danger-btn" onclick={handleDisableEncryption}>
+            {t('settings.encryptionWarningConfirm') || 'Disable Encryption'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Recovery Phrase Modal -->
+{#if showRecoveryPhraseModal}
+  <div class="modal-backdrop">
+    <div class="modal-container glassmorphic phrase-modal-container">
+      <h3 class="modal-title">{t('settings.encryptionRecoveryTitle') || 'Secure Recovery Phrase'}</h3>
+      <p class="modal-desc">
+        {t('settings.encryptionRecoveryDesc') || 'Please write down these 12 words on a piece of paper and keep them completely safe. If you lose your password AND this recovery phrase, your data is lost forever.'}
+      </p>
+
+      <div class="recovery-phrase-box">
+        {#each generatedPhrase.split(' ') as word, i}
+          <div class="recovery-word">
+            <span class="word-number">{i + 1}</span>
+            <span class="word-text">{word}</span>
+          </div>
+        {/each}
+      </div>
+
+      <div class="modal-actions phrase-actions">
+        <button class="btn-outline" onclick={copyPhrase}>
+          {phraseCopied ? (t('settings.encryptionRecoveryCopied') || 'Copied!') : (t('settings.encryptionRecoveryCopy') || 'Copy phrase')}
+        </button>
+        <button class="btn-primary" onclick={() => showRecoveryPhraseModal = false}>I've Written It Down</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Database Rewrite Progress Overlay -->
+{#if $isRewriting}
+  <div class="rewrite-overlay">
+    <div class="rewrite-card glassmorphic">
+      <div class="spinner"></div>
+      <h3 class="rewrite-title">Rewriting Local Database...</h3>
+      <p class="rewrite-desc">Encrypting or decrypting your captures on your device. Please do not close or reload the app.</p>
+      <div class="progress-bar-container large-bar">
+        <div class="progress-bar">
+          <div class="progress-fill animate-pulse" style="width: {$rewriteTotal > 0 ? Math.round(($rewriteDone / $rewriteTotal) * 100) : 0}%"></div>
+        </div>
+      </div>
+      <p class="rewrite-count">{$rewriteDone} / {$rewriteTotal} captures rewritten ({$rewriteTotal > 0 ? Math.round(($rewriteDone / $rewriteTotal) * 100) : 0}%)</p>
+    </div>
+  </div>
+{/if}
+
 <style>
+  /* Modals */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn var(--duration-fast) ease-out;
+  }
+  .modal-container {
+    width: 90%;
+    max-width: 460px;
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-xl);
+    animation: scaleUp var(--duration-fast) ease-out;
+  }
+  .phrase-modal-container {
+    max-width: 520px;
+  }
+  .glassmorphic {
+    background: rgba(var(--color-surface-raw, 25, 25, 30), 0.85);
+    backdrop-filter: blur(16px);
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0 0 8px;
+  }
+  .modal-desc {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0 0 20px;
+  }
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .phrase-actions {
+    justify-content: space-between;
+    margin-top: 24px;
+  }
+  .danger-btn {
+    background: var(--color-danger) !important;
+  }
+  .danger-btn:hover {
+    background: color-mix(in srgb, var(--color-danger) 85%, black) !important;
+  }
+
+  /* Progress Bars */
+  .progress-bar-container {
+    width: 100%;
+    margin: 4px 0;
+  }
+  .progress-bar {
+    height: 6px;
+    background: var(--color-border);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+    transition: width var(--duration-normal) var(--ease-out);
+  }
+  .animate-pulse {
+    animation: pulse 2s infinite ease-in-out;
+  }
+
+  /* Recovery Phrase Grid */
+  .recovery-phrase-box {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin: 16px 0;
+  }
+  @media (max-width: 480px) {
+    .recovery-phrase-box {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .recovery-word {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    color: var(--color-text);
+  }
+  .word-number {
+    color: var(--color-text-secondary);
+    opacity: 0.5;
+    font-size: 11px;
+    width: 16px;
+    text-align: right;
+  }
+  .word-text {
+    font-weight: 600;
+  }
+
+  /* Rewrite Overlay */
+  .rewrite-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  .rewrite-card {
+    width: 90%;
+    max-width: 440px;
+    padding: 32px 24px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    text-align: center;
+    box-shadow: var(--shadow-2xl);
+  }
+  .rewrite-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 16px 0 8px;
+  }
+  .rewrite-desc {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0 0 24px;
+  }
+  .large-bar .progress-bar {
+    height: 10px;
+  }
+  .rewrite-count {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 12px 0 0;
+    font-weight: 500;
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    margin: 0 auto;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+  }
+  @keyframes scaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+  }
+
+  .page-title { font-size:28px; font-weight:700; color:var(--color-text); margin:0 0 28px; }
   .page-title { font-size:28px; font-weight:700; color:var(--color-text); margin:0 0 28px; }
   .section { margin-bottom:28px; }
   .section-title { font-size:16px; font-weight:600; color:var(--color-text); margin:0 0 10px; }

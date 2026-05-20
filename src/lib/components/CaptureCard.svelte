@@ -16,6 +16,7 @@
 
   let {
     capture,
+    searchScore,
     onDelete,
     onArchive,
     onRestore,
@@ -24,6 +25,7 @@
     visibleIds
   }: {
     capture: Capture;
+    searchScore?: number;
     onDelete?: (id: string) => void;
     onArchive?: (id: string) => void;
     onRestore?: (id: string) => void;
@@ -37,6 +39,7 @@
   let isSelected = $derived($selectedIds.has(capture.id));
   let isSelectionMode = $derived($selectionMode === 'selection');
   let isOcrRunning = $derived($activeOcrRuns.has(capture.id));
+  let displayScore = $derived(searchScore !== undefined && searchScore >= 0.7 ? `${Math.round(searchScore * 100)}% match` : null);
 
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
   let longPressTriggered = $state(false);
@@ -211,6 +214,9 @@
 
     <span class={`type-pill type-${capture.type}`}>{typeLabels[capture.type]}</span>
     <span class="card-date">{formatDate(capture.createdAt)}</span>
+    {#if displayScore}
+      <span class="match-badge">{displayScore}</span>
+    {/if}
     {#if !isSelectionMode}
       <button class="menu-btn" onclick={(e) => { e.stopPropagation(); showMenu = !showMenu; }} aria-label="Card actions">...</button>
     {/if}
@@ -607,6 +613,19 @@
     font-size: 12px;
     color: var(--color-danger);
     font-weight: 500;
+  }
+
+  .match-badge {
+    padding: 2px 8px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.22);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
   }
 
   .ocr-retry-btn {
