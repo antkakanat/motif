@@ -591,4 +591,37 @@ Comparable privacy/lifetime apps at $19–$29 one-time: typical conversion rate 
 
 ---
 
+## 19. Future Feature Candidates (Planning Phase)
+
+During the product polish cycle, three highly useful local-first features were identified as candidates for future development. These features extend Motif's local intelligence and security boundaries.
+
+### Wording & Alignment Overview
+
+All three candidates are recommended to be placed behind the **PRO gate**. Since Motif offers unlimited captures and core search completely free, these highly advanced premium capabilities provide a strong value proposition for lifetime upgrade conversions without feeling hostile to free-tier users.
+
+| Feature Candidate | Target Tier | Rationale for Pro Gate |
+|-------------------|-------------|------------------------|
+| **Local Secure Credentials Vault (Password Safe)** | 🔒 Pro Gate | Involves heavy Web Crypto API encryption keys (PBKDF2/AES-GCM), master passwords, and zero-knowledge identity vaults. Fits daily critical-path utility. |
+| **Spatial Canvas & Visual Mind Map View** | 🎨 Pro Gate | High-end visual workspace. Utilizes coordinate systems, drag-and-drop nodes, and glowing connector threads to visually map thoughts. |
+| **Local Offline AI Auto-Tagger & Summarizer** | 🧠 Pro Gate | Compute-heavy client-side Transformers.js execution using WebAssembly/WebGPU. Delivers deep conceptual summaries and auto-classification. |
+
+### Technical Concepts for Candidates
+
+#### A. Local Secure Credentials Vault (Password Manager)
+* **Goal**: Provide a completely offline, zero-knowledge password and credentials vault integrated directly with captured links and bookmarks.
+* **Security Stack**: Web Crypto API. Password input is hashed using PBKDF2 (100,000+ iterations) to derive an AES-256-GCM encryption key. Raw database records are completely unreadable to anyone inspecting IndexedDB without the master password.
+* **Capture Integration**: Add a secure "Attach Credentials" action to saved links, allowing users to copy-paste passwords and usernames seamlessly during link browsing.
+
+#### B. Spatial Canvas & Visual Mind Map View
+* **Goal**: Shift the landing dashboard from a standard card grid into a dynamic, zoomable, and pannable infinite mesh canvas.
+* **Interactive Design**: Arrange notes, screenshots, quotes, and links as floating cards. Users can draw glowing connection paths (using Bezier arcs) to organize research projects, mapping out complex relational notes locally.
+* **Performance**: GPU-accelerated SVG coordinates and vanilla HTML transforms ensuring 60fps tracking during panning/zooming.
+
+#### C. Local Offline AI Auto-Tagger & Text Summarizer
+* **Goal**: Automatically summarize captured quotes, note content, and articles while generating highly relevant, automated metadata tags without any network requests.
+* **AI Engine**: transformers.js running lightweight models (like `all-MiniLM-L6-v2`) locally in the browser background via WebAssembly. Keeps 100% of user thoughts safe on their machine.
+
+---
+
 *End of Motif product notes. Ready to begin implementation — start with the data schema, then build the SvelteKit project structure.*
+
