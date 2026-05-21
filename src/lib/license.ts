@@ -1,10 +1,10 @@
 // ────────────────────────────────────────────────
-// License — Phase 1 stub (validates format, POSTs to /api/activate)
-// Phase 2: /api/activate will call LemonSqueezy + manage device slots
+// License — Production Implementation with server-side validation
 // ────────────────────────────────────────────────
 
+import { get } from 'svelte/store';
 import { validateKeyFormat } from '$lib/pro';
-import { activateLicense, deactivateLicense } from '$lib/stores/settings';
+import { settings, activateLicense, deactivateLicense } from '$lib/stores/settings';
 import { browser } from '$app/environment';
 
 // ── Device ID — stable per browser instance ──
@@ -38,7 +38,6 @@ export async function activate(key: string): Promise<ActivationResult> {
   }
 
   try {
-    // POST to the SvelteKit server route (stub in Phase 1, real API in Phase 2)
     const response = await fetch('/api/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,16 +61,37 @@ export async function activate(key: string): Promise<ActivationResult> {
       slotsUsed: data.slotsUsed,
       slotsTotal: data.slotsTotal
     };
-  } catch {
-    // Offline fallback — if server unreachable and format is valid, activate locally
-    // This is intentional: after first online activation, offline use always works
-    await activateLicense(normalized);
-    return { success: true };
+  } catch (err) {
+    // Offline verification fails explicitly on first activation
+    console.error('License activation client error:', err);
+    return {
+      success: false,
+      error: 'Network connection error. Please connect to the internet to activate your license.'
+    };
   }
 }
 
 // ── Deactivate ──
 
 export async function deactivate(): Promise<void> {
+  const key = get(settings).licenseKey;
+
+  if (key) {
+    try {
+      // Call SvelteKit API endpoint to release the device slot on Vercel KV / LemonSqueezy
+      await fetch('/api/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licenseKey: key,
+          deviceId: getDeviceId()
+        })
+      });
+    } catch (err) {
+      console.warn('Deactivation server sync failed (will still clean up locally):', err);
+    }
+  }
+
+  // Deactivate locally anyway to ensure user is logged out of local Pro
   await deactivateLicense();
 }
