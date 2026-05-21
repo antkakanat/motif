@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { CHECKOUT_URLS } from '$lib/constants';
-  import { settings, setAutoLockMinutes, setAutoOcr } from '$lib/stores/settings';
+  import { settings, setAutoLockMinutes, setAutoOcr, setAutoFetchMetadata } from '$lib/stores/settings';
   import { db } from '$lib/db';
   import { runOcrOnCapture } from '$lib/stores/captures';
   import { themeMode, setTheme, type ThemeMode } from '$lib/theme';
@@ -280,6 +280,10 @@
 
   async function handleAutoOcrToggle(enabled: boolean) {
     await setAutoOcr(enabled);
+  }
+
+  async function handleAutoFetchMetadataToggle(enabled: boolean) {
+    await setAutoFetchMetadata(enabled);
   }
 
   async function handleScanAllSkipped() {
@@ -570,6 +574,19 @@
         </div>
         <label class="switch">
           <input type="checkbox" checked={$settings.autoOcr} onchange={(e) => handleAutoOcrToggle((e.target as HTMLInputElement).checked)} />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-divider"></div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Auto-fetch link preview</span>
+          <p class="setting-hint">Enriches saved links with page titles, descriptions, and thumbnails via jsonlink.io. Disable for absolute privacy.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked={$settings.autoFetchMetadata} onchange={(e) => handleAutoFetchMetadataToggle((e.target as HTMLInputElement).checked)} />
           <span class="slider"></span>
         </label>
       </div>

@@ -11,6 +11,7 @@ import { settings } from '$lib/stores/settings';
 import { activeOcrRuns } from '$lib/ocr';
 import { showToast } from '$lib/stores/toast';
 import { indexCaptureSingle } from '$lib/stores/semanticSearch';
+import { fetchLinkMetadata } from '$lib/metadata';
 import {
   sessionKey,
   isLocked,
@@ -96,8 +97,11 @@ export interface CreateCaptureInput {
   content: string;
   tags?: string[];
   sourceUrl?: string;
-  ogImage?: string;
-  ogTitle?: string;
+  ogImage?: string | null;
+  ogTitle?: string | null;
+  favicon?: string | null;
+  description?: string | null;
+  reminderAt?: string | null;
   status?: CaptureStatus;
   collectionId?: string | null;
 }
@@ -111,6 +115,8 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     content: input.content,
     ogImage: input.ogImage ?? null,
     ogTitle: input.ogTitle ?? null,
+    favicon: input.favicon ?? null,
+    description: input.description ?? null,
     tags: input.tags ?? [],
     collectionId: input.collectionId ?? null,
     isTrashed: false,
@@ -119,7 +125,9 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     updatedAt: now(),
     ocrText: null,
     ocrStatus: input.type === 'image' ? 'pending' : undefined,
-    sourceUrl: input.sourceUrl ?? null
+    sourceUrl: input.sourceUrl ?? null,
+    reminderAt: input.reminderAt ?? null,
+    reminderDone: false
   };
 
   // Encrypt record if database is encrypted
@@ -145,9 +153,9 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     await completeOnboarding();
   }
 
-  // Save first, enrich in background.
-  if (capture.type === 'link' && !capture.ogTitle && !capture.ogImage) {
-    void fetchMetadata(capture.id, capture.content);
+  // Save first, enrich in background (respects autoFetchMetadata privacy setting).
+  if (capture.type === 'link' && get(settings).autoFetchMetadata) {
+    void fetchMetadataForCapture(capture.id, capture.content);
   }
 
   // Trigger OCR in background for images
@@ -483,22 +491,20 @@ function suggestAutoTags(params: {
     .map(([token]) => token);
 }
 
-async function fetchMetadata(id: string, url: string) {
+async function fetchMetadataForCapture(id: string, url: string) {
   try {
-    const res = await fetch(`/api/og?url=${encodeURIComponent(url)}`);
-    if (!res.ok) return;
-
-    const data = await res.json();
+    const data = await fetchLinkMetadata(url);
     const current = get(captures).find((capture) => capture.id === id);
     if (!current) return;
 
     const updates: Partial<Capture> = {};
-    const title = typeof data.title === 'string' ? data.title.trim() : '';
-    const image = typeof data.image === 'string' ? data.image.trim() : '';
-    const description = typeof data.description === 'string' ? data.description.trim() : '';
+    const title = data.title?.trim() ?? '';
+    const description = data.description?.trim() ?? '';
 
     if (title) updates.ogTitle = title;
-    if (image) updates.ogImage = image;
+    if (data.ogImage) updates.ogImage = data.ogImage;
+    if (data.favicon) updates.favicon = data.favicon;
+    if (description) updates.description = description;
 
     if (title && shouldAutoReplaceTitle(current.title, url)) {
       updates.title = title;

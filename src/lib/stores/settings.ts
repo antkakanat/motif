@@ -17,7 +17,8 @@ const KEYS = {
   PIN_LENGTH: 'pinLength',
   AUTO_OCR: 'autoOcr',
   AUTO_AI_SEARCH: 'autoAiSearch',
-  DB_ENCRYPTED: 'dbEncrypted'
+  DB_ENCRYPTED: 'dbEncrypted',
+  AUTO_FETCH_METADATA: 'autoFetchMetadata'
 } as const;
 
 // ── Settings store ──
@@ -33,6 +34,7 @@ interface SettingsState {
   autoOcr: boolean;
   autoAiSearch: boolean;
   dbEncrypted: boolean;
+  autoFetchMetadata: boolean;
 }
 
 const defaultSettings: SettingsState = {
@@ -45,7 +47,8 @@ const defaultSettings: SettingsState = {
   pinLength: 4,
   autoOcr: true,
   autoAiSearch: false,
-  dbEncrypted: false
+  dbEncrypted: false,
+  autoFetchMetadata: true
 };
 
 export const settings = writable<SettingsState>({ ...defaultSettings });
@@ -89,6 +92,9 @@ export async function loadSettings(): Promise<void> {
         break;
       case KEYS.DB_ENCRYPTED:
         state.dbEncrypted = row.value === 'true';
+        break;
+      case KEYS.AUTO_FETCH_METADATA:
+        state.autoFetchMetadata = row.value === 'true';
         break;
     }
   }
@@ -175,6 +181,11 @@ export async function setAutoAiSearch(enabled: boolean): Promise<void> {
 export async function setDbEncrypted(enabled: boolean): Promise<void> {
   await saveSetting(KEYS.DB_ENCRYPTED, String(enabled));
   settings.update((s) => ({ ...s, dbEncrypted: enabled }));
+}
+
+export async function setAutoFetchMetadata(enabled: boolean): Promise<void> {
+  await saveSetting(KEYS.AUTO_FETCH_METADATA, String(enabled));
+  settings.update((s) => ({ ...s, autoFetchMetadata: enabled }));
 }
 
 // ── Onboarding ──

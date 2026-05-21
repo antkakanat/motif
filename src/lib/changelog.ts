@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------
+// ------------------------------------------------
 // Changelog - static version history
 // ------------------------------------------------
 
@@ -9,6 +9,20 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: '1.2.0',
+    date: '2026-05-21',
+    items: [
+      'Local AI semantic search — find captures by meaning, not just keywords (23MB one-time download)',
+      'AES-256 local encryption — protect all capture text with a password + 12-word recovery phrase',
+      'Link metadata auto-fetch — titles, descriptions and favicons filled in automatically on save',
+      'Reminders — attach a due date to any capture and get a local notification',
+      'Keyboard shortcut cheatsheet — press ? anywhere to see all shortcuts',
+      'Empty states — helpful prompts when no captures match a filter',
+      'What\'s New modal — see what changed on every update',
+      'Haptic feedback on mobile PWA saves and lock interactions'
+    ]
+  },
   {
     version: '1.1.0',
     date: '2026-05-13',

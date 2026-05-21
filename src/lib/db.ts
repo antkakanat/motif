@@ -13,8 +13,10 @@ export interface Capture {
   status: CaptureStatus;
   title: string;
   content: string; // URL for links, quote text, Tiptap JSON for notes, blob ref for images
-  ogImage: string | null;
-  ogTitle: string | null;
+  ogImage: string | null;       // Phase F: OG image URL from metadata fetch
+  ogTitle: string | null;       // Phase F: OG title (enriched)
+  favicon: string | null;       // Phase F: favicon URL (google s2 fallback)
+  description: string | null;   // Phase F: OG description / meta description
   tags: string[];
   collectionId: string | null;
   isTrashed: boolean;
@@ -26,6 +28,9 @@ export interface Capture {
   ocrError?: string;
   ocrUpdatedAt?: string;
   sourceUrl: string | null;
+  // Phase G — Reminders
+  reminderAt: string | null;    // ISO timestamp, null = no reminder
+  reminderDone: boolean;         // true once notification has fired
 }
 
 export interface Collection {
@@ -85,6 +90,12 @@ export class MotifDB extends Dexie {
     // Schema v3 — added embeddings table for Phase D Local AI Search
     this.version(3).stores({
       embeddings: 'captureId',
+    });
+
+    // Schema v4 — Phase F (metadata enrichment) + Phase G (reminders) fields
+    // Fields are optional in object structure; index reminderAt for reminder queries
+    this.version(4).stores({
+      captures: 'id, type, status, *tags, collectionId, isTrashed, createdAt, updatedAt, sourceUrl, reminderAt',
     });
   }
 }

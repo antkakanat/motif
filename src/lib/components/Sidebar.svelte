@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { t } from '$lib/i18n';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -8,6 +8,8 @@
   import { requestProFeature } from '$lib/pro';
   import { resolvedTheme } from '$lib/theme';
   import NavIcon from '$lib/components/NavIcon.svelte';
+  import { getOverdueCount } from '$lib/reminders';
+  import { onMount } from 'svelte';
 
   interface NavItem {
     href: string;
@@ -26,15 +28,29 @@
     { href: '/images', icon: 'image', label: t('nav.images') }
   ];
 
-  const utilityItems: NavItem[] = [
-    { href: '/archived', icon: 'archived', label: t('status.archived') },
-    { href: '/trash', icon: 'trash', label: t('nav.trash') }
-  ];
-
   let collapsed = $state(false);
   let isAdding = $state(false);
   let newName = $state('');
   let inputEl = $state<HTMLInputElement | null>(null);
+  let overdueCount = $state(0);
+
+  onMount(() => {
+    async function fetchCount() {
+      overdueCount = await getOverdueCount();
+    }
+    fetchCount();
+    // Refresh every minute
+    const interval = setInterval(async () => {
+      await fetchCount();
+    }, 60000);
+    return () => clearInterval(interval);
+  });
+
+  const utilityItems: NavItem[] = [
+    { href: '/reminders', icon: 'reminder', label: 'Reminders' },
+    { href: '/archived', icon: 'archived', label: t('status.archived') },
+    { href: '/trash', icon: 'trash', label: t('nav.trash') }
+  ];
 
   function isActive(href: string, pathname: string): boolean {
     if (href === '/') return pathname === '/';
@@ -156,6 +172,9 @@
         <a href={item.href} class="nav-item" class:active={isActive(item.href, $page.url.pathname)} title={collapsed ? item.label : undefined}>
           <span class="nav-icon"><NavIcon name={item.icon} size={18} /></span>
           {#if !collapsed}<span class="nav-label">{item.label}</span>{/if}
+          {#if item.href === '/reminders' && overdueCount > 0}
+            <span class="overdue-badge">{overdueCount}</span>
+          {/if}
         </a>
       {/each}
     </div>
@@ -310,6 +329,21 @@
     border-radius:var(--radius-full);
     color:var(--color-primary);
     background:color-mix(in srgb, var(--color-primary) 14%, transparent);
+  }
+
+  .overdue-badge {
+    margin-left:auto;
+    min-width:18px;
+    height:18px;
+    padding:0 5px;
+    border-radius:var(--radius-full);
+    background:#f59e0b;
+    color:#fff;
+    font-size:0.7rem;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
   }
 
   .collections-list { display:flex; flex-direction:column; gap:2px; }

@@ -18,6 +18,7 @@
   }
 
   const moreItems = [
+    { href: '/reminders', icon: 'reminder', label: 'Reminders' },
     { href: '/quotes', icon: 'quote', label: t('nav.quotes') },
     { href: '/notes', icon: 'note', label: t('nav.notes') },
     { href: '/images', icon: 'image', label: t('nav.images') },

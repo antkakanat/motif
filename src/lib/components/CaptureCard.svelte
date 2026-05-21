@@ -13,6 +13,7 @@
   import { updateCapture, runOcrOnCapture } from '$lib/stores/captures';
   import { activeOcrRuns } from '$lib/ocr';
   import { requestProFeature } from '$lib/pro';
+  import { formatReminderDate } from '$lib/reminders';
 
   let {
     capture,
@@ -40,6 +41,13 @@
   let isSelectionMode = $derived($selectionMode === 'selection');
   let isOcrRunning = $derived($activeOcrRuns.has(capture.id));
   let displayScore = $derived(searchScore !== undefined && searchScore >= 0.7 ? `${Math.round(searchScore * 100)}% match` : null);
+  let reminderLabel = $derived(() => {
+    if (!capture.reminderAt || capture.reminderDone) return null;
+    return formatReminderDate(capture.reminderAt);
+  });
+  let isReminderOverdue = $derived(
+    !!capture.reminderAt && !capture.reminderDone && capture.reminderAt < new Date().toISOString()
+  );
 
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
   let longPressTriggered = $state(false);
@@ -258,6 +266,9 @@
       <blockquote class="card-quote">"{truncate(capture.content, 220)}"</blockquote>
     {:else if capture.type === 'link'}
       <div class="link-container">
+        {#if capture.favicon}
+          <img src={capture.favicon} alt="" class="link-favicon" width="14" height="14" loading="lazy" />
+        {/if}
         <p class="card-link">{truncate(capture.content, 72)}</p>
       </div>
     {:else}
@@ -272,6 +283,11 @@
         <span class="sr-only">{t('status.unread')}</span>
       {:else if capture.status === 'archived'}
         <span class="status-pill">{t('status.archived')}</span>
+      {/if}
+      {#if reminderLabel()}
+        <span class="reminder-badge" class:overdue={isReminderOverdue} title={reminderLabel() ?? ''}>
+          🔔 {isReminderOverdue ? 'Overdue' : reminderLabel()}
+        </span>
       {/if}
     </div>
     <div class="footer-right">
@@ -488,6 +504,41 @@
     background: var(--color-primary-subtle);
     border-color: var(--color-primary);
   }
+
+  .link-favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  .reminder-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+    white-space: nowrap;
+  }
+
+  .reminder-badge.overdue {
+    color: #d97706;
+    background: color-mix(in srgb, #f59e0b 14%, transparent);
+    border-color: color-mix(in srgb, #f59e0b 30%, transparent);
+    animation: reminder-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes reminder-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
   .card-tags { display:flex; flex-wrap:wrap; gap:4px; }
   .card-tag { padding:2px 8px; background:var(--color-primary-subtle); color:var(--color-primary); border-radius:var(--radius-full); font-size:11px; font-weight:500; }
   .sr-only {

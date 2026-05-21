@@ -7,6 +7,9 @@
   import { collections } from '$lib/stores/collections';
   import { isProUnlocked, requestProFeature } from '$lib/pro';
   import NavIcon from '$lib/components/NavIcon.svelte';
+  import { fetchLinkMetadata, type LinkMetadata } from '$lib/metadata';
+  import { settings } from '$lib/stores/settings';
+  import { scheduleReminder, cancelReminder, checkNotificationPermission, formatReminderDate } from '$lib/reminders';
 
   type Tab = CaptureType;
 
@@ -59,6 +62,9 @@
   
   let ocrText = $state<string | null>(null);
   let ocrStatus = $state<string | undefined>(undefined);
+  let reminderAt = $state<string>('');
+  let metadataLoading = $state(false);
+  let metadataPreview = $state<LinkMetadata | null>(null);
 
   let isOcrRunning = $derived(initialData?.id ? $activeOcrRuns.has(initialData.id) : false);
 
@@ -78,6 +84,8 @@
         activeTab = defaultTab;
         ocrText = null;
         ocrStatus = undefined;
+        reminderAt = '';
+        metadataPreview = null;
         reset();
       }
     }
@@ -116,6 +124,8 @@
     tags = [];
     collectionId = null;
     duplicateCapture = undefined;
+    reminderAt = '';
+    metadataPreview = null;
   }
 
   function close() {
@@ -143,8 +153,21 @@
       sourceUrl: sourceUrl.trim(),
       collectionId,
       ocrText,
-      ocrStatus
+      ocrStatus,
+      ...(metadataPreview ? {
+        favicon: metadataPreview.favicon,
+        ogImage: metadataPreview.ogImage,
+        description: metadataPreview.description
+      } : {})
     });
+
+    // Schedule reminder if set
+    if (reminderAt && initialData?.id) {
+      await scheduleReminder(initialData.id, new Date(reminderAt).toISOString());
+    }
+
+    // Haptic feedback on save
+    (window as any).__motifVibrate?.(10);
 
     close();
   }
@@ -214,6 +237,25 @@
     { key: 'image', label: t('capture.addImage'), icon: 'image' }
   ];
 
+  async function handleUrlBlur() {
+    const url = content.trim();
+    if (activeTab !== 'link' || !url || !$settings.autoFetchMetadata) return;
+    if (!url.startsWith('http')) return;
+    metadataLoading = true;
+    try {
+      const meta = await fetchLinkMetadata(url);
+      metadataPreview = meta;
+      // Auto-fill title only if still empty
+      if (!title.trim() && meta.title) {
+        title = meta.title;
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      metadataLoading = false;
+    }
+  }
+
   function handleImageUpload(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -225,6 +267,15 @@
       if (!title) title = file.name.replace(/\.[^.]+$/, '');
     };
     reader.readAsDataURL(file);
+  }
+
+  function setReminderPreset(offsetMs: number) {
+    const dt = new Date(Date.now() + offsetMs);
+    // Round to nearest 5 minutes
+    dt.setMinutes(Math.ceil(dt.getMinutes() / 5) * 5, 0, 0);
+    // Format as datetime-local value
+    const pad = (n: number) => String(n).padStart(2, '0');
+    reminderAt = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   }
 </script>
 
@@ -265,12 +316,35 @@
 
         <!-- Type-specific content -->
         {#if activeTab === 'link'}
-          <input
-            type="url"
-            class="input"
-            placeholder={t('capture.urlPlaceholder')}
-            bind:value={content}
-          />
+          <div class="url-input-wrapper">
+            <input
+              type="url"
+              class="input"
+              placeholder={t('capture.urlPlaceholder')}
+              bind:value={content}
+              onblur={handleUrlBlur}
+            />
+            {#if metadataLoading}
+              <span class="url-fetching">🔍 Fetching preview...</span>
+            {/if}
+          </div>
+          {#if metadataPreview && (metadataPreview.ogImage || metadataPreview.description)}
+            <div class="og-preview fade-in">
+              {#if metadataPreview.favicon}
+                <img src={metadataPreview.favicon} alt="" class="og-favicon" width="16" height="16" />
+              {/if}
+              {#if metadataPreview.domain}
+                <span class="og-domain">{metadataPreview.domain}</span>
+              {/if}
+              {#if metadataPreview.description}
+                <p class="og-desc">{metadataPreview.description.slice(0, 120)}{metadataPreview.description.length > 120 ? '…' : ''}</p>
+              {/if}
+              {#if metadataPreview.ogImage}
+                <img src={metadataPreview.ogImage} alt="Page preview" class="og-image" loading="lazy" />
+              {/if}
+              <button class="og-clear" onclick={() => metadataPreview = null} aria-label="Clear preview">×</button>
+            </div>
+          {/if}
           {#if duplicateCapture}
             <div class="duplicate-warning">
               <span class="warning-icon">⚠️</span>
@@ -412,6 +486,27 @@
               onblur={addTag}
             />
           </div>
+        </div>
+
+        <!-- Reminder -->
+        <div class="reminder-section">
+          <p class="reminder-label">🔔 Remind me</p>
+          <div class="reminder-presets">
+            <button class="preset-btn" class:active={false} onclick={() => setReminderPreset(60 * 60 * 1000)}>1h</button>
+            <button class="preset-btn" class:active={false} onclick={() => setReminderPreset(24 * 60 * 60 * 1000)}>Tomorrow</button>
+            <button class="preset-btn" class:active={false} onclick={() => setReminderPreset(7 * 24 * 60 * 60 * 1000)}>Next week</button>
+            {#if reminderAt}
+              <button class="preset-btn active clear-preset" onclick={() => reminderAt = ''}>Clear ×</button>
+            {/if}
+          </div>
+          <input
+            type="datetime-local"
+            class="input reminder-input"
+            bind:value={reminderAt}
+          />
+          {#if reminderAt}
+            <p class="reminder-preview">⏰ {formatReminderDate(new Date(reminderAt).toISOString())}</p>
+          {/if}
         </div>
       </div>
 
@@ -892,5 +987,142 @@
     border-color: var(--color-primary);
     background: var(--color-primary-subtle);
     color: var(--color-primary);
+  }
+
+  /* Phase F — URL metadata preview */
+  .url-input-wrapper { position: relative; }
+
+  .url-fetching {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    padding: 4px 2px;
+    animation: pulse-text 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-text {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .og-preview {
+    position: relative;
+    margin-top: 6px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .og-favicon {
+    display: inline-block;
+    border-radius: 3px;
+    object-fit: contain;
+    vertical-align: middle;
+  }
+
+  .og-domain {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  .og-desc {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
+
+  .og-image {
+    width: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+  }
+
+  .og-clear {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+
+  .og-clear:hover { background: var(--color-border); color: var(--color-text); }
+
+  /* Phase G — Reminder section */
+  .reminder-section {
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .reminder-label {
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+
+  .reminder-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .preset-btn {
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--duration-fast);
+  }
+
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+  }
+
+  .clear-preset {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: color-mix(in srgb, #ef4444 8%, transparent);
+  }
+
+  .clear-preset:hover {
+    border-color: #ef4444;
+    background: color-mix(in srgb, #ef4444 14%, transparent);
+    color: #ef4444;
+  }
+
+  .reminder-input {
+    font-size: 0.85rem;
+    color-scheme: dark;
+  }
+
+  .reminder-preview {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    color: var(--color-primary);
+    font-weight: 600;
   }
 </style>

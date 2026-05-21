@@ -6,6 +6,8 @@
   import InstallPromptBanner from '$lib/components/InstallPromptBanner.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import ProActionGateModal from '$lib/components/ProActionGateModal.svelte';
+  import WhatsNew from '$lib/components/WhatsNew.svelte';
+  import ShortcutCheatsheet from '$lib/components/ShortcutCheatsheet.svelte';
   import { initI18n } from '$lib/i18n';
   import { loadCaptures, purgeOldTrash } from '$lib/stores/captures';
   import { loadCollections } from '$lib/stores/collections';
@@ -21,10 +23,18 @@
   import { pwaInfo } from 'virtual:pwa-info';
   import { isForceFreeMode } from '$lib/pro';
   import { sessionKey } from '$lib/encryption';
+  import { restoreReminderTimers } from '$lib/reminders';
+  import { browser } from '$app/environment';
+
+  const WHATS_NEW_KEY = 'motif_last_seen_version';
+  const CURRENT_VERSION = '1.2.0';
+
 
   let { children } = $props();
   let ready = $state(false);
   let showUpdateToast = $state(false);
+  let showWhatsNew = $state(false);
+  let showShortcuts = $state(false);
   let swRegistration = $state<ServiceWorkerRegistration | undefined>(undefined);
   let forceFreeMode = $derived(isForceFreeMode());
 
@@ -86,6 +96,17 @@
 
     ready = true;
 
+    // Check if What's New should auto-show
+    if (browser) {
+      const seen = localStorage.getItem(WHATS_NEW_KEY);
+      if (seen !== CURRENT_VERSION) {
+        setTimeout(() => { showWhatsNew = true; }, 1200);
+      }
+    }
+
+    // Restore in-tab reminder timers
+    await restoreReminderTimers();
+
     // Redirect to lock if PIN is set or database is encrypted and locked, and we're not already on the lock route
     const hasPIN = $settings.pinHash;
     const isDbLocked = $settings.dbEncrypted && !$sessionKey;
@@ -103,8 +124,26 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    // ? opens shortcuts cheatsheet (when not typing in an input)
+    if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+      e.preventDefault();
+      showShortcuts = true;
+      return;
+    }
     handleKeydown(e);
     handleUserActivity();
+  }
+
+  /** Trigger haptic feedback on mobile PWA */
+  function vibrate(pattern: number | number[]) {
+    if (browser && 'vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  }
+
+  // Expose vibrate globally so child components can call it
+  if (browser) {
+    (window as any).__motifVibrate = vibrate;
   }
 </script>
 
@@ -154,6 +193,8 @@
 <Toast />
 <OnlineStatusToast />
 <ProActionGateModal />
+<WhatsNew bind:open={showWhatsNew} />
+<ShortcutCheatsheet bind:open={showShortcuts} />
 
 {#if showUpdateToast}
   <UpdateToast 
