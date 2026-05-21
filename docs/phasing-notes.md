@@ -187,3 +187,38 @@
 - Checked system reliability and compilation:
   - Run verification tasks yielding zero TypeScript or Svelte template compilation errors.
 
+## Addendum (2026-05-22, Phases F, G, H, Theme Hotfix & Pro Gate Hardening)
+
+### Phase F — Smart Link Metadata Auto-Fetch
+- Implemented fully client-side link metadata fetch (`src/lib/metadata.ts`) with Google favicon and jsonlink.io integrations.
+- Integrated asynchronous metadata retrieval into `CaptureModal.svelte` triggered by input blur, auto-filling the capture details and providing a clean card-preview layout.
+- Extended the IndexedDB data store schema to handle `favicon`, `ogImage`, and `description` tags in version 4 migration.
+- Enabled rich favicon badges and visual card thumbnails for link-based captures in `CaptureCard.svelte`.
+- Added an auto-fetch metadata privacy opt-out switch under Settings.
+
+### Phase G — Reminders & Due Dates
+- Built an offline, fully local scheduling reminder manager (`src/lib/reminders.ts`) using IndexedDB lookups, local timeout queues, and browser notifications with state restoration on startup.
+- Designed a custom date-time selector and preset pills inside `CaptureModal.svelte` for quick scheduling.
+- Implemented relative overdue labels and badge alerts utilizing clean pulsing animations on `CaptureCard.svelte`.
+- Created a dedicated reminders hub page at `/reminders` grouping overdue and upcoming alerts.
+- Configured a dynamic unread reminder badge in navigation menus (Desktop Sidebar and Mobile Bottom Navigation) refreshing periodically.
+
+### Phase H — UX Polish & Performance
+- Designed and built the reusable `EmptyState.svelte` component displaying custom assets, actions, and floating micro-animations.
+- Used the illustrated empty state across all categories (`+page`, `/links`, `/quotes`, `/notes`, `/images`, `/archived`, `/trash`, `/reminders`).
+- Integrated a global keyboard shortcut cheatsheet modal `ShortcutCheatsheet.svelte` accessible by pressing `?` key.
+- Shipped an automated version-tracked What's New modal (`WhatsNew.svelte`) utilizing a central structured `changelog.ts` payload.
+- Added light haptic vibration feedback using the standard Web Vibration API.
+
+### Theme Hotfix: Light Mode Encryption Modal
+- Addressed accessibility and legibility issues in Light Mode on the "AES-256 Encryption" setup and decryption modals.
+- Mapped the CSS custom property `--color-surface-raw` correctly in [layout.css](file:///c:/Users/User/Project/my-projects/motif/src/routes/layout.css):
+  - **Light Mode (`@theme` block)**: `--color-surface-raw: 249, 248, 255;`
+  - **Dark Mode (`.dark` overrides block)**: `--color-surface-raw: 28, 26, 48;`
+- Restored glassmorphic theme transitions ensuring ideal contrast ratios across both Light and Dark modes.
+
+### Hardening Pro Gating Contracts
+- Enforced correct premium gates for both **Local OCR** and **AI Semantic Search** features by aligning Svelte event handlers and settings toggles with the `requestProFeature` pattern:
+  - **AI Search Opt-In**: Gated the main page AI search activation button.
+  - **Settings Panels**: Gated the AI Semantic Search and Auto-OCR checkboxes to gracefully prompt users to upgrade.
+  - **Manual Trigger Points**: Gated the manual scan buttons ("Scan all now" in Settings, "Retry Scan" on Capture Cards, and manual OCR triggers inside Capture Modals) so Free tier trial expirations behave correctly.
