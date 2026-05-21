@@ -173,6 +173,9 @@
   }
 
   async function triggerManualOcr() {
+    const allowed = await requestProFeature('ocr', 'Local OCR');
+    if (!allowed) return;
+
     if (!initialData?.id) {
       const { performOCR } = await import('$lib/ocr');
       ocrStatus = 'processing';

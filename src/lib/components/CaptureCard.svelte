@@ -252,7 +252,7 @@
       {:else if capture.ocrStatus === 'failed'}
         <div class="ocr-failed-row" onclick={(e) => e.stopPropagation()}>
           <span class="ocr-failed-text">⚠ Text extraction failed</span>
-          <button class="ocr-retry-btn" onclick={(e) => { e.stopPropagation(); runOcrOnCapture(capture.id, capture.content, true); }}>
+          <button class="ocr-retry-btn" onclick={async (e) => { e.stopPropagation(); const allowed = await requestProFeature('ocr', 'Local OCR'); if (allowed) runOcrOnCapture(capture.id, capture.content, true); }}>
             Retry
           </button>
         </div>

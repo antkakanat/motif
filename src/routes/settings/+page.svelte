@@ -63,6 +63,11 @@
   // AI Search states & handlers
   async function handleAiSearchToggle(enabled: boolean) {
     if (enabled) {
+      const allowed = await requestProFeature('aiSearch', 'AI Semantic Search');
+      if (!allowed) {
+        settings.update(s => ({ ...s }));
+        return;
+      }
       if (get(modelLoadingState) !== 'ready') {
         initWorker();
       }
@@ -279,6 +284,13 @@
   }
 
   async function handleAutoOcrToggle(enabled: boolean) {
+    if (enabled) {
+      const allowed = await requestProFeature('ocr', 'Local OCR');
+      if (!allowed) {
+        settings.update(s => ({ ...s }));
+        return;
+      }
+    }
     await setAutoOcr(enabled);
   }
 
@@ -287,6 +299,9 @@
   }
 
   async function handleScanAllSkipped() {
+    const allowed = await requestProFeature('ocr', 'Local OCR');
+    if (!allowed) return;
+
     isScanningSkipped = true;
     scannedProgress = 0;
     try {

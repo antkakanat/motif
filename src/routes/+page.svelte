@@ -441,8 +441,11 @@
           </button>
           <button class="btn-enable-ai" onclick={async () => {
             showAiOptInModal = false;
-            await setAutoAiSearch(true);
-            isAiSearchActive = true;
+            const allowed = await requestProFeature('aiSearch', 'AI Semantic Search');
+            if (allowed) {
+              await setAutoAiSearch(true);
+              isAiSearchActive = true;
+            }
           }}>
             {t('search.aiModalEnable')}
           </button>
