@@ -6,6 +6,8 @@
   import CaptureCard from '$lib/components/CaptureCard.svelte';
   import BulkActionBar from '$lib/components/BulkActionBar.svelte';
   import CaptureModal from '$lib/components/CaptureModal.svelte';
+  import LandingPage from '$lib/components/LandingPage.svelte';
+  import { fade } from 'svelte/transition';
   import type { CaptureType, CaptureStatus, Capture } from '$lib/db';
   import { registerShortcuts } from '$lib/shortcuts';
   import { startOnboarding } from '$lib/onboarding';
@@ -36,6 +38,9 @@
   let isAiSearchActive = $state(false);
   let showAiOptInModal = $state(false);
   let aiSearchScores = $state<Record<string, number>>({});
+
+  let bypassLanding = $state(false);
+  let searchFocused = $state(false);
 
   function openNewCapture() {
     editingCapture = null;
@@ -303,128 +308,163 @@
   }
 </script>
 
-<div class="page fade-in">
-  <!-- Header -->
-  <div class="page-header">
-    <div class="header-left">
-      <div class="title-row">
-        <h1 id="page-title" class="page-title">{t('nav.allCaptures')}</h1>
-        <span class="capture-count">{displayedCaptures.length}</span>
+{#if $nonTrashedCaptures.length === 0 && !bypassLanding}
+  <LandingPage onEnterDashboard={() => bypassLanding = true} />
+{:else}
+  <div class="page fade-in">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-left">
+        <div class="title-row">
+          <h1 id="page-title" class="page-title">{t('nav.allCaptures')}</h1>
+          <span class="capture-count">{displayedCaptures.length}</span>
+        </div>
+        <span class="privacy-badge">Private by default</span>
       </div>
-      <span class="privacy-badge">Private by default</span>
-    </div>
-    <button id="btn-new-capture" class="btn-new" onclick={openNewCapture}
-      title={t('shortcuts.newCapture')}>
-      <span class="btn-icon">+</span>
-      <span class="btn-label">{t('capture.addNew')}</span>
-    </button>
-  </div>
-
-  <!-- Search & Filters -->
-  <div class="toolbar">
-    <div class="search-bar">
-      <span class="search-icon">🔍</span>
-      <input
-        id="search-input"
-        type="text"
-        class="search-input"
-        placeholder={t('search.placeholder')}
-        bind:value={searchQuery}
-        oninput={handleSearch}
-      />
-      {#if searchQuery}
-        <button class="search-clear" onclick={() => { searchQuery = ''; searchResults = []; aiSearchScores = {}; }}>✕</button>
-      {/if}
-      <button
-        type="button"
-        class="ai-search-toggle"
-        class:active={isAiSearchActive && $settings.autoAiSearch}
-        onclick={toggleAiSearch}
-        title={t('search.aiToggle')}
-      >
-        ✨
+      <button id="btn-new-capture" class="btn-new" onclick={openNewCapture}
+        title={t('shortcuts.newCapture')}>
+        <span class="btn-icon">+</span>
+        <span class="btn-label">{t('capture.addNew')}</span>
       </button>
     </div>
-    <div class="filters">
-      <select class="filter-select" bind:value={filterType}>
-        <option value="all">{t('filter.allTypes')}</option>
-        <option value="link">{t('nav.links')}</option>
-        <option value="quote">{t('nav.quotes')}</option>
-        <option value="note">{t('nav.notes')}</option>
-        <option value="image">{t('nav.images')}</option>
-      </select>
-      <select class="filter-select" bind:value={filterStatus}>
-        <option value="active">{t('filter.inbox')}</option>
-        <option value="all">{t('filter.allStatuses')}</option>
-        <option value="unread">{t('status.unread')}</option>
-        <option value="saved">{t('status.saved')}</option>
-        <option value="archived">{t('status.archived')}</option>
-      </select>
-    </div>
-  </div>
 
-  <!-- AI Status Banner -->
-  {#if isAiSearchActive && $settings.autoAiSearch}
-    {#if $modelLoadingState === 'loading'}
-      <div class="ai-status-banner glass">
-        <div class="status-left">
-          <span class="spinner">⏳</span>
-          <span class="status-text">{t('search.aiDownloading', { progress: $downloadProgress })}</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar-fill" style="width: {$downloadProgress}%"></div>
-        </div>
-      </div>
-    {:else if $isBackfilling}
-      <div class="ai-status-banner glass">
-        <div class="status-left">
-          <span class="pulse-dot"></span>
-          <span class="status-text">
-            {t('search.aiIndexing', { done: $backfillProgress.done, total: $backfillProgress.total })} ({$backfillProgress.percent}%)
-          </span>
-        </div>
-        <div class="status-right">
-          <div class="progress-bar-container mini">
-            <div class="progress-bar-fill" style="width: {$backfillProgress.percent}%"></div>
+    <!-- Search & Filters -->
+    <div class="toolbar">
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input
+          id="search-input"
+          type="text"
+          class="search-input"
+          placeholder={t('search.placeholder')}
+          bind:value={searchQuery}
+          oninput={handleSearch}
+          onfocus={() => searchFocused = true}
+          onblur={() => setTimeout(() => searchFocused = false, 200)}
+          onkeydown={(e) => {
+            if (e.altKey && e.key.toLowerCase() === 'l') {
+              e.preventDefault();
+              filterType = 'link';
+              showToast('Filtered to Links');
+            } else if (e.altKey && e.key.toLowerCase() === 'q') {
+              e.preventDefault();
+              filterType = 'quote';
+              showToast('Filtered to Quotes');
+            } else if (e.altKey && e.key.toLowerCase() === 'n') {
+              e.preventDefault();
+              filterType = 'note';
+              showToast('Filtered to Notes');
+            } else if (e.altKey && e.key.toLowerCase() === 'i') {
+              e.preventDefault();
+              filterType = 'image';
+              showToast('Filtered to Images');
+            } else if (e.altKey && e.key.toLowerCase() === 'a') {
+              e.preventDefault();
+              filterType = 'all';
+              showToast('Showing all types');
+            }
+          }}
+        />
+        {#if searchFocused}
+          <div class="search-shortcuts" transition:fade={{ duration: 100 }}>
+            <span class="search-badge" title="Filter to Links (Alt+L)">⌥L Links</span>
+            <span class="search-badge" title="Filter to Quotes (Alt+Q)">⌥Q Quotes</span>
           </div>
-          <button class="btn-cancel-indexing" onclick={cancelBackfill}>[Cancel]</button>
+        {/if}
+        {#if searchQuery}
+          <button class="search-clear" onclick={() => { searchQuery = ''; searchResults = []; aiSearchScores = {}; }}>✕</button>
+        {/if}
+        <button
+          type="button"
+          class="ai-search-toggle"
+          class:active={isAiSearchActive && $settings.autoAiSearch}
+          onclick={toggleAiSearch}
+          title={t('search.aiToggle')}
+        >
+          ✨
+        </button>
+      </div>
+      <div class="filters">
+        <select class="filter-select" bind:value={filterType}>
+          <option value="all">{t('filter.allTypes')}</option>
+          <option value="link">{t('nav.links')}</option>
+          <option value="quote">{t('nav.quotes')}</option>
+          <option value="note">{t('nav.notes')}</option>
+          <option value="image">{t('nav.images')}</option>
+        </select>
+        <select class="filter-select" bind:value={filterStatus}>
+          <option value="active">{t('filter.inbox')}</option>
+          <option value="all">{t('filter.allStatuses')}</option>
+          <option value="unread">{t('status.unread')}</option>
+          <option value="saved">{t('status.saved')}</option>
+          <option value="archived">{t('status.archived')}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- AI Status Banner -->
+    {#if isAiSearchActive && $settings.autoAiSearch}
+      {#if $modelLoadingState === 'loading'}
+        <div class="ai-status-banner glass">
+          <div class="status-left">
+            <span class="spinner">⏳</span>
+            <span class="status-text">{t('search.aiDownloading', { progress: $downloadProgress })}</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: {$downloadProgress}%"></div>
+          </div>
         </div>
+      {:else if $isBackfilling}
+        <div class="ai-status-banner glass">
+          <div class="status-left">
+            <span class="pulse-dot"></span>
+            <span class="status-text">
+              {t('search.aiIndexing', { done: $backfillProgress.done, total: $backfillProgress.total })} ({$backfillProgress.percent}%)
+            </span>
+          </div>
+          <div class="status-right">
+            <div class="progress-bar-container mini">
+              <div class="progress-bar-fill" style="width: {$backfillProgress.percent}%"></div>
+            </div>
+            <button class="btn-cancel-indexing" onclick={cancelBackfill}>[Cancel]</button>
+          </div>
+        </div>
+      {/if}
+    {/if}
+
+    <!-- Capture Grid -->
+    {#if displayedCaptures.length > 0}
+      <div class="capture-grid">
+        {#each displayedCaptures as capture (capture.id)}
+          <CaptureCard 
+            {capture} 
+            searchScore={aiSearchScores[capture.id]}
+            onDelete={handleDelete}
+            onArchive={handleArchive}
+            onEdit={openEditModal}
+            onOpen={handleCardOpen}
+            {visibleIds}
+          />
+        {/each}
+      </div>
+    {:else}
+      <div class="empty-state slide-up">
+        <div class="empty-icon">📝</div>
+        <h2 class="empty-title">
+          {searchQuery ? t('search.noResults') : t('empty.allCaptures')}
+        </h2>
+        <p class="empty-hint">
+          {searchQuery ? '' : t('empty.allCapturesHint')}
+        </p>
+        {#if !searchQuery}
+          <button class="btn-empty" onclick={openNewCapture}>
+            <span>+</span> {t('capture.addNew')}
+          </button>
+        {/if}
       </div>
     {/if}
-  {/if}
-
-  <!-- Capture Grid -->
-  {#if displayedCaptures.length > 0}
-    <div class="capture-grid">
-      {#each displayedCaptures as capture (capture.id)}
-        <CaptureCard 
-          {capture} 
-          searchScore={aiSearchScores[capture.id]}
-          onDelete={handleDelete}
-          onArchive={handleArchive}
-          onEdit={openEditModal}
-          onOpen={handleCardOpen}
-          {visibleIds}
-        />
-      {/each}
-    </div>
-  {:else}
-    <div class="empty-state slide-up">
-      <div class="empty-icon">📝</div>
-      <h2 class="empty-title">
-        {searchQuery ? t('search.noResults') : t('empty.allCaptures')}
-      </h2>
-      <p class="empty-hint">
-        {searchQuery ? '' : t('empty.allCapturesHint')}
-      </p>
-      {#if !searchQuery}
-        <button class="btn-empty" onclick={openNewCapture}>
-          <span>+</span> {t('capture.addNew')}
-        </button>
-      {/if}
-    </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <!-- Modal -->
 <CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
@@ -501,11 +541,46 @@
   }
 
   .toolbar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-  .search-bar { display:flex; align-items:center; flex:1; min-width:200px; padding:0 14px; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); transition:border-color var(--duration-fast); }
-  .search-bar:focus-within { border-color:var(--color-primary); box-shadow:0 0 0 3px rgba(91,78,214,0.1); }
+  .search-bar {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 200px;
+    padding: 0 16px;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+    border-radius: var(--radius-full);
+    background: rgba(var(--color-surface-raw), 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all var(--duration-normal) var(--ease-out);
+    box-shadow: var(--shadow-sm);
+  }
+  .search-bar:focus-within {
+    border-color: var(--color-primary);
+    background: rgba(var(--color-surface-raw), 0.85);
+    box-shadow: 0 0 20px rgba(91, 78, 214, 0.22), 0 0 0 1px var(--color-primary);
+  }
   .search-icon { font-size:0.875rem; margin-right:8px; }
   .search-input { flex:1; border:none; background:none; outline:none; padding:10px 0; font-size:0.875rem; color:var(--color-text); font-family:var(--font-sans); }
   .search-clear { background:none; border:none; cursor:pointer; color:var(--color-text-secondary); font-size:0.875rem; padding:4px; }
+  .search-shortcuts {
+    display: flex;
+    gap: 6px;
+    margin-right: 8px;
+    align-items: center;
+  }
+  .search-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+    border-radius: var(--radius-sm);
+    cursor: default;
+    user-select: none;
+    white-space: nowrap;
+  }
 
   .filters { display:flex; gap:8px; }
   .filter-select { padding:8px 12px; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); color:var(--color-text); font-size:0.8125rem; cursor:pointer; font-family:var(--font-sans); outline:none; }

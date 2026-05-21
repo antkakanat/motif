@@ -26,6 +26,8 @@
   import { restoreReminderTimers } from '$lib/reminders';
   import { browser } from '$app/environment';
 
+  import { showToast } from '$lib/stores/toast';
+
   const WHATS_NEW_KEY = 'motif_last_seen_version';
   const CURRENT_VERSION = '1.2.0';
 
@@ -102,6 +104,28 @@
       if (seen !== CURRENT_VERSION) {
         setTimeout(() => { showWhatsNew = true; }, 1200);
       }
+
+      // Initialize LemonSqueezy overlay checkout
+      const initLemon = () => {
+        if ((window as any).LemonSqueezy) {
+          try {
+            (window as any).LemonSqueezy.Setup({
+              eventHandler: (event: any) => {
+                console.log('LemonSqueezy Event:', event);
+                if (event.event === 'Checkout.Success') {
+                  showToast('🎉 Purchase successful! Enter your license key to activate Pro.');
+                  void goto('/settings?activate=1');
+                }
+              }
+            });
+          } catch (e) {
+            console.error('Failed to setup LemonSqueezy event handler:', e);
+          }
+        } else {
+          setTimeout(initLemon, 500);
+        }
+      };
+      setTimeout(initLemon, 1000);
     }
 
     // Restore in-tab reminder timers
@@ -156,6 +180,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   {@html pwaInfo ? pwaInfo.webManifest.linkTag : ''}
+  <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
 </svelte:head>
 
 <!-- Track user activity to reset idle timer -->

@@ -222,3 +222,24 @@
   - **AI Search Opt-In**: Gated the main page AI search activation button.
   - **Settings Panels**: Gated the AI Semantic Search and Auto-OCR checkboxes to gracefully prompt users to upgrade.
   - **Manual Trigger Points**: Gated the manual scan buttons ("Scan all now" in Settings, "Retry Scan" on Capture Cards, and manual OCR triggers inside Capture Modals) so Free tier trial expirations behave correctly.
+
+## Addendum (2026-05-22, Phase 3: Spatial Ambient Workspace & Direct Checkout Overlay)
+
+### Spatial Ambient Theme & Workspace Dashboard
+- Implemented stacked GPU-accelerated radial drift meshes in `src/routes/layout.css` to create a beautiful, organic ambient background.
+- Redesigned the Sidebar (`src/lib/components/Sidebar.svelte`) and Mobile Bottom Nav (`src/lib/components/BottomNav.svelte`) as floating glassmorphic panels that appear detached and responsive.
+- Added pure-CSS perspective-tilt depth states, micro-spring transitions, and premium glowing neon selection frames on `src/lib/components/CaptureCard.svelte`.
+- Restyled the search capsule to float in a frosted capsule bar with key indicators, hotkey mappings (`⌥L Links`, `⌥Q Quotes`), and focus-triggered badges in `src/routes/+page.svelte`.
+
+### Tech Sandbox Playground & Client OCR
+- Built a majestic landing page `src/lib/components/LandingPage.svelte` featuring gradient typography, a beautiful functional viewport sandbox, client-side Tesseract.js local OCR scanner with neon sweep lasers, and category filters.
+- Implemented off-screen canvas rendering in the playground to guarantee 100% reliable local character recognition without static network dependencies.
+
+### Native LemonSqueezy Overlay Checkout
+- Loaded the official LemonSqueezy modal SDK (`lemon.js`) natively on layout mount inside `src/routes/+layout.svelte`.
+- Registered success handlers to intercept completed purchases and redirect to `/settings?activate=1` with an activation toast.
+- Bound premium action gates (`ProGate.svelte`, `ProActionGateModal.svelte`) and Settings purchase buttons to call the SDK overlay programmatically (`window.LemonSqueezy.Url.Open(url)`) with a robust fallback to standard tab targets if the SDK is blocked or offline.
+
+### Verification & SEO Audit
+- Upgraded `src/app.html` with modern semantic fallback headers, complete OpenGraph and Twitter cards previewing `/screenshots/desktop.png` to maximize social sharing conversions.
+- Validated the entire application using `npm run check`, completing successfully with zero TypeScript or Svelte compiler errors. Verified Vite client and server compiles through successful production build pipeline targets.

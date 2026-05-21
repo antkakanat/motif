@@ -358,18 +358,26 @@
 <style>
   .card {
     position:relative;
-    background:var(--color-surface);
-    border:1px solid var(--color-border);
+    background:rgba(var(--color-surface-raw), 0.55);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    border:1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
     border-radius:var(--radius-lg);
     padding:14px 14px 12px;
-    transition:all var(--duration-fast) var(--ease-out);
     cursor:pointer;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    transition: transform var(--duration-slow) var(--ease-out), 
+                border-color var(--duration-normal) var(--ease-out), 
+                box-shadow var(--duration-normal) var(--ease-out), 
+                background var(--duration-normal) var(--ease-out);
   }
 
   .card:hover {
-    border-color:var(--color-primary);
-    box-shadow:var(--shadow-md);
-    transform:translateY(-1px);
+    border-color:color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background:rgba(var(--color-surface-raw), 0.75);
+    box-shadow: 0 12px 28px rgba(91, 78, 214, 0.12), 0 0 1px rgba(91, 78, 214, 0.1);
+    transform: translateY(-5px) scale(1.015) rotateX(1.2deg) rotateY(1.2deg);
   }
 
   .card:focus-visible {
@@ -383,8 +391,14 @@
 
   .card.selected {
     border-color: var(--color-primary);
-    background: var(--color-primary-subtle);
-    box-shadow: 0 0 0 1px var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 9%, rgba(var(--color-surface-raw), 0.75));
+    box-shadow: 0 0 22px rgba(91, 78, 214, 0.22), 0 0 0 1px var(--color-primary);
+    transform: scale(0.985);
+  }
+
+  .card.selected:hover {
+    transform: scale(0.995) translateY(-2px);
+    box-shadow: 0 0 26px rgba(91, 78, 214, 0.32), 0 0 0 1px var(--color-primary);
   }
 
   .card.trashed { opacity:0.7; }

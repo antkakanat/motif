@@ -196,15 +196,20 @@
     display:flex;
     flex-direction:column;
     width:270px;
-    height:100vh;
-    background:var(--color-surface);
-    border-right:1px solid var(--color-border);
-    padding:14px 12px;
+    height:calc(100vh - 32px);
+    background:rgba(var(--color-surface-raw), 0.65);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+    border-radius:var(--radius-xl);
+    padding:16px 12px;
     position:sticky;
-    top:0;
+    top:16px;
+    margin:16px 0 16px 16px;
     flex-shrink:0;
     z-index:40;
-    transition:width var(--duration-normal) var(--ease-out);
+    box-shadow:var(--shadow-md);
+    transition:width var(--duration-normal) var(--ease-out), background var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
   }
 
   .sidebar.collapsed { width:72px; }
@@ -289,27 +294,34 @@
     font-size:0.875rem;
     font-weight:500;
     position:relative;
+    border:1px solid transparent;
     transition:all var(--duration-fast) var(--ease-out);
   }
 
-  .nav-item:hover { background:var(--color-primary-subtle); color:var(--color-text); }
+  .nav-item:hover {
+    background:color-mix(in srgb, var(--color-primary) 8%, rgba(var(--color-surface-raw), 0.3));
+    color:var(--color-text);
+  }
 
   .nav-item.active {
-    background:var(--color-primary-subtle);
+    background:color-mix(in srgb, var(--color-primary) 12%, rgba(var(--color-surface-raw), 0.5));
+    border-color:color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
     color:var(--color-primary);
     font-weight:600;
+    box-shadow:var(--shadow-sm);
   }
 
   .nav-item.active::before {
     content:'';
     position:absolute;
-    left:0;
+    left:-2px;
     top:50%;
     transform:translateY(-50%);
-    width:3px;
-    height:20px;
+    width:4px;
+    height:18px;
     background:var(--color-primary);
     border-radius:0 var(--radius-full) var(--radius-full) 0;
+    box-shadow: 0 0 8px var(--color-primary);
   }
 
   .nav-icon {

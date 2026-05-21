@@ -52,15 +52,23 @@
 
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick={openSettings}>Settings</button>
-        <a
-          href={CHECKOUT_URLS.pro}
-          target="_blank"
-          rel="noopener"
+        <button
           class="btn btn-primary"
-          onclick={handleUpgradeClick}
+          onclick={(e) => {
+            handleUpgradeClick();
+            if ((window as any).LemonSqueezy) {
+              try {
+                (window as any).LemonSqueezy.Url.Open(CHECKOUT_URLS.pro);
+                return;
+              } catch (err) {
+                console.error('Failed to open LemonSqueezy overlay:', err);
+              }
+            }
+            window.open(CHECKOUT_URLS.pro, '_blank', 'noopener,noreferrer');
+          }}
         >
           {t('pro.gate.cta')}
-        </a>
+        </button>
       </div>
     </div>
   </div>

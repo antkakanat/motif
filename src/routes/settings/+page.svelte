@@ -352,6 +352,19 @@
     licenseSuccess = false;
   }
 
+  function openCheckout(url: string, e: MouseEvent) {
+    e.preventDefault();
+    if ((window as any).LemonSqueezy) {
+      try {
+        (window as any).LemonSqueezy.Url.Open(url);
+        return;
+      } catch (err) {
+        console.error('Failed to open LemonSqueezy overlay:', err);
+      }
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   async function handleExport() {
     const allowed = await requestProFeature('export', 'Export Backup');
     if (!allowed) return;
@@ -453,7 +466,13 @@
       {:else}
         <div class="pro-badge free-badge">{t('pro.settings.status.free')}</div>
         <p class="section-desc">
-          <a href={CHECKOUT_URLS.pro} target="_blank" rel="noopener" class="btn btn-primary account-buy-btn">
+          <a
+            href={CHECKOUT_URLS.pro}
+            target="_blank"
+            rel="noopener"
+            class="btn btn-primary account-buy-btn"
+            onclick={(e) => openCheckout(CHECKOUT_URLS.pro, e)}
+          >
             Get Lifetime Pro — $29
           </a>
         </p>
@@ -463,9 +482,21 @@
         </p>
         <p class="setting-hint seats-hint">
           Need more seats?
-          <a href={CHECKOUT_URLS.family} target="_blank" rel="noopener" class="link-muted">Family (5 seats)</a>
+          <a
+            href={CHECKOUT_URLS.family}
+            target="_blank"
+            rel="noopener"
+            class="link-muted"
+            onclick={(e) => openCheckout(CHECKOUT_URLS.family, e)}
+          >Family (5 seats)</a>
           ·
-          <a href={CHECKOUT_URLS.team} target="_blank" rel="noopener" class="link-muted">Team (10 seats)</a>
+          <a
+            href={CHECKOUT_URLS.team}
+            target="_blank"
+            rel="noopener"
+            class="link-muted"
+            onclick={(e) => openCheckout(CHECKOUT_URLS.team, e)}
+          >Team (10 seats)</a>
         </p>
         <p class="setting-hint" style="margin-bottom: 8px;">Already purchased? Enter license key</p>
         <div class="license-form">

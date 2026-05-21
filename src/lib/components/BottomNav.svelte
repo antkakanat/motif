@@ -87,18 +87,20 @@
   .bottom-nav {
     display:none;
     position:fixed;
-    bottom:0;
-    left:0;
-    right:0;
-    height:calc(68px + env(safe-area-inset-bottom, 0px));
-    background:var(--color-surface);
-    border-top:1px solid var(--color-border);
-    z-index:60;
-    padding:0 4px env(safe-area-inset-bottom, 0px);
-    align-items:center;
-    justify-content:space-between;
+    bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+    left:12px;
+    right:12px;
+    height:64px;
+    background:rgba(var(--color-surface-raw), 0.7);
     backdrop-filter:blur(16px);
     -webkit-backdrop-filter:blur(16px);
+    border:1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+    border-radius:var(--radius-xl);
+    z-index:60;
+    padding:0 4px;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:var(--shadow-lg);
   }
 
   @media (max-width: 768px) {
@@ -130,13 +132,14 @@
   .bottom-item.active::after {
     content: '';
     position: absolute;
-    top: 0;
+    bottom: 6px;
     left: 50%;
     transform: translateX(-50%);
-    width: 24px;
+    width: 12px;
     height: 3px;
     background: var(--color-primary);
-    border-radius: 0 0 4px 4px;
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 6px var(--color-primary);
   }
 
   .bottom-icon {
@@ -163,10 +166,10 @@
   }
 
   .capture-fab {
-    width:52px;
-    height:52px;
+    width:48px;
+    height:48px;
     border-radius:50%;
-    margin-top:-28px;
+    margin-top:-22px;
     border:none;
     background:var(--color-primary);
     color:#fff;
@@ -174,7 +177,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:2rem;
+    font-size:1.8rem;
     line-height:1;
     box-shadow: 0 8px 20px rgba(91, 78, 214, 0.4);
     flex-shrink:0;
@@ -204,9 +207,11 @@
     position:fixed;
     left:12px;
     right:12px;
-    bottom:calc(80px + env(safe-area-inset-bottom, 0px));
-    background:var(--color-surface);
-    border:1px solid var(--color-border);
+    bottom:calc(86px + env(safe-area-inset-bottom, 0px));
+    background:rgba(var(--color-surface-raw), 0.85);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
     border-radius:var(--radius-xl);
     box-shadow:var(--shadow-xl);
     padding:16px;
@@ -241,7 +246,8 @@
     color:var(--color-text-secondary);
     font-size:12px;
     font-weight:600;
-    background:var(--color-bg);
+    background:rgba(var(--color-surface-raw), 0.3);
+    transition:all var(--duration-fast);
   }
 
   .sheet-item.active {
