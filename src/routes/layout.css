@@ -15,6 +15,7 @@
   --color-bg: #FFFFFF;
   --color-surface: #F9F8FF;
   --color-border: #E8E6F8;
+  --color-surface-raw: 249, 248, 255;
 
   /* Light mode text */
   --color-text: #1A1730;
@@ -102,6 +103,7 @@ body {
   --color-bg: #0F0E1A;
   --color-surface: #1C1A30;
   --color-border: #2E2B4A;
+  --color-surface-raw: 28, 26, 48;
 
   --color-text: #F0EEFE;
   --color-text-secondary: #A09CC8;
