@@ -118,7 +118,10 @@
       const extUrl = $page.url.searchParams.get('ext_url') || '';
       const extTitle = $page.url.searchParams.get('ext_title') || '';
       const extText = $page.url.searchParams.get('ext_text') || '';
-      void handleExtensionCapture(extType, extUrl, extTitle, extText);
+      const extFavicon = $page.url.searchParams.get('ext_favicon') || '';
+      const extDescription = $page.url.searchParams.get('ext_description') || '';
+      const extImage = $page.url.searchParams.get('ext_image') || '';
+      void handleExtensionCapture(extType, extUrl, extTitle, extText, extFavicon, extDescription, extImage);
       return; // skip Share Target handling
     }
 
@@ -149,7 +152,15 @@
   });
 
   // ── Extension capture auto-save ──
-  async function handleExtensionCapture(type: string, url: string, title: string, text: string) {
+  async function handleExtensionCapture(
+    type: string,
+    url: string,
+    title: string,
+    text: string,
+    favicon?: string,
+    description?: string,
+    ogImage?: string
+  ) {
     try {
       const captureType: CaptureType = type === 'quote' ? 'quote' : 'link';
 
@@ -171,6 +182,9 @@
         title: displayTitle || 'Untitled',
         content: captureType === 'quote' ? text : url,
         sourceUrl: captureType === 'quote' ? url : undefined,
+        favicon: favicon || undefined,
+        description: description || undefined,
+        ogImage: ogImage || undefined,
       });
 
       showToast(captureType === 'quote' ? '✓ Quote saved from extension' : '✓ Link saved from extension');

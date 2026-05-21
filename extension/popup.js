@@ -20,10 +20,40 @@ saveBtn.addEventListener('click', async () => {
       return;
     }
 
+    let favicon = tab.favIconUrl || '';
+    let description = '';
+    let ogImage = '';
+
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const getMeta = (name) => {
+            return document.querySelector(`meta[property="${name}"]`)?.getAttribute('content') ||
+                   document.querySelector(`meta[name="${name}"]`)?.getAttribute('content') ||
+                   null;
+          };
+          return {
+            description: getMeta('description') || getMeta('og:description') || '',
+            ogImage: getMeta('og:image') || getMeta('twitter:image') || ''
+          };
+        }
+      });
+      if (results?.[0]?.result) {
+        description = results[0].result.description || '';
+        ogImage = results[0].result.ogImage || '';
+      }
+    } catch (err) {
+      console.warn('Metadata extraction failed:', err);
+    }
+
     await chrome.runtime.sendMessage({
       action: 'saveLink',
       url: tab.url,
-      title: tab.title || tab.url
+      title: tab.title || tab.url,
+      favicon,
+      description,
+      ogImage
     });
 
     // Success feedback

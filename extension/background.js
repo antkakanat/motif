@@ -20,11 +20,43 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'save-quote' && info.selectionText) {
+    let description = '';
+    let ogImage = '';
+    let favicon = tab?.favIconUrl || '';
+
+    if (tab && tab.id && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            const getMeta = (name) => {
+              return document.querySelector(`meta[property="${name}"]`)?.getAttribute('content') ||
+                     document.querySelector(`meta[name="${name}"]`)?.getAttribute('content') ||
+                     null;
+            };
+            return {
+              description: getMeta('description') || getMeta('og:description') || '',
+              ogImage: getMeta('og:image') || getMeta('twitter:image') || ''
+            };
+          }
+        });
+        if (results?.[0]?.result) {
+          description = results[0].result.description || '';
+          ogImage = results[0].result.ogImage || '';
+        }
+      } catch (err) {
+        console.warn('Metadata extraction in context menu failed:', err);
+      }
+    }
+
     await openMotifInBackground({
       ext_type: 'quote',
       ext_url: tab?.url || '',
       ext_title: tab?.title || '',
-      ext_text: info.selectionText
+      ext_text: info.selectionText,
+      ext_favicon: favicon,
+      ext_description: description,
+      ext_image: ogImage
     });
 
     // Brief badge feedback (no popup for context menu actions)
@@ -41,7 +73,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     openMotifInBackground({
       ext_type: 'link',
       ext_url: message.url,
-      ext_title: message.title
+      ext_title: message.title,
+      ext_favicon: message.favicon,
+      ext_description: message.description,
+      ext_image: message.ogImage
     }).then(() => sendResponse({ success: true }));
     return true; // keep channel open for async response
   }
@@ -61,6 +96,15 @@ async function openMotifInBackground(params) {
   }
   if (params.ext_url && params.ext_url.length > 1000) {
     params.ext_url = params.ext_url.substring(0, 1000);
+  }
+  if (params.ext_description && params.ext_description.length > 300) {
+    params.ext_description = params.ext_description.substring(0, 300) + '…';
+  }
+  if (params.ext_image && params.ext_image.length > 500) {
+    params.ext_image = params.ext_image.substring(0, 500);
+  }
+  if (params.ext_favicon && params.ext_favicon.length > 500) {
+    params.ext_favicon = params.ext_favicon.substring(0, 500);
   }
 
   const query = new URLSearchParams(params).toString();
