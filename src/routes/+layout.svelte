@@ -9,7 +9,8 @@
   import WhatsNew from '$lib/components/WhatsNew.svelte';
   import ShortcutCheatsheet from '$lib/components/ShortcutCheatsheet.svelte';
   import { initI18n } from '$lib/i18n';
-  import { loadCaptures, purgeOldTrash } from '$lib/stores/captures';
+  import { get } from 'svelte/store';
+  import { captures, loadCaptures, purgeOldTrash } from '$lib/stores/captures';
   import { loadCollections } from '$lib/stores/collections';
   import { loadSettings, settings } from '$lib/stores/settings';
   import { registerShortcuts, handleKeydown } from '$lib/shortcuts';
@@ -100,8 +101,14 @@
 
     // Check if What's New should auto-show
     if (browser) {
-      const seen = localStorage.getItem(WHATS_NEW_KEY);
-      if (seen !== CURRENT_VERSION) {
+      const storedVersion = localStorage.getItem(WHATS_NEW_KEY);
+      const currentVersion = CURRENT_VERSION;
+      const shouldShowWhatsNew = 
+        get(captures).length > 0 && 
+        storedVersion !== currentVersion &&
+        currentVersion !== null;
+
+      if (shouldShowWhatsNew) {
         setTimeout(() => { showWhatsNew = true; }, 1200);
       }
 

@@ -62,7 +62,7 @@ export function isFreeUser(): boolean {
   return !isProUnlocked();
 }
 
-const KEY_REGEX = /^(MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})$/;
+const KEY_REGEX = /^[A-Z0-9-]{10,64}$/;
 
 export function validateKeyFormat(key: string): boolean {
   return KEY_REGEX.test(key.toUpperCase().trim());

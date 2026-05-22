@@ -53,6 +53,11 @@ export async function activate(key: string): Promise<ActivationResult> {
       return { success: false, error: data.error ?? 'Activation failed' };
     }
 
+    // Persist LemonSqueezy instance.id in localStorage for slot tracking/deactivation
+    if (browser && data.instanceId) {
+      localStorage.setItem('motif_license_instance_id', data.instanceId);
+    }
+
     // Store Pro state locally — subsequent app opens don't need internet
     await activateLicense(normalized);
 
@@ -78,18 +83,24 @@ export async function deactivate(): Promise<void> {
 
   if (key) {
     try {
-      // Call SvelteKit API endpoint to release the device slot on Vercel KV / LemonSqueezy
+      const instanceId = browser ? localStorage.getItem('motif_license_instance_id') : null;
+      
+      // Call SvelteKit API endpoint to release the device slot on LemonSqueezy
       await fetch('/api/deactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           licenseKey: key,
-          deviceId: getDeviceId()
+          instanceId: instanceId || ''
         })
       });
     } catch (err) {
       console.warn('Deactivation server sync failed (will still clean up locally):', err);
     }
+  }
+
+  if (browser) {
+    localStorage.removeItem('motif_license_instance_id');
   }
 
   // Deactivate locally anyway to ensure user is logged out of local Pro

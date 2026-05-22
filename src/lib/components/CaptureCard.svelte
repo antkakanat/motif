@@ -292,6 +292,7 @@
     </div>
     <div class="footer-right">
       {#if capture.type === 'link' && !isSelectionMode}
+        <a class="open-link-btn" href={capture.content} target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>Open ↗</a>
         <button class="read-btn" type="button" onclick={handleReadClick}>Read</button>
       {/if}
       {#if capture.tags.length > 0}
@@ -308,6 +309,11 @@
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="ctx-menu scale-in" role="menu" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       {#if !capture.isTrashed}
+        {#if capture.type === 'link'}
+          <a class="mi" href={capture.content} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.stopPropagation(); closeMenu(); }}>Open Link ↗</a>
+          <button class="mi" onclick={(e) => { handleReadClick(e); closeMenu(); }}>Read (Pro)</button>
+        {/if}
+
         {#if onEdit}
           <button class="mi" onclick={() => { onEdit(capture); closeMenu(); }}>Edit</button>
         {/if}
@@ -517,6 +523,28 @@
   .read-btn:hover {
     background: var(--color-primary-subtle);
     border-color: var(--color-primary);
+  }
+  .open-link-btn {
+    border: 1px solid color-mix(in srgb, var(--color-text-secondary) 25%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-surface-raw) 20%, transparent);
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  .open-link-btn:hover {
+    background: rgba(var(--color-surface-raw), 0.8);
+    border-color: var(--color-text);
+    color: var(--color-text);
   }
 
   .link-favicon {
@@ -769,5 +797,12 @@
 
   @keyframes ocr-spin {
     to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .card:hover, .card.selected, .card.selected:hover {
+      transform: none !important;
+      transition: none !important;
+    }
   }
 </style>

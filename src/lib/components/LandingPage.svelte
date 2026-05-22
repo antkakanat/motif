@@ -124,8 +124,13 @@
     ctx.fillText('No cloud requests were made.', width / 2, height / 2 + 40);
   }
 
+  let hostname = $state('motif.byant.dev');
+
   onMount(() => {
     prepareOcrCanvas();
+    if (typeof window !== 'undefined') {
+      hostname = window.location.hostname || 'motif.byant.dev';
+    }
   });
 
   // Run real local OCR demo using Tesseract
@@ -263,7 +268,7 @@
           <span class="dot green"></span>
         </div>
         <div class="viewport-address">
-          <span>motif.app / sandbox / playground</span>
+          <span>{hostname} / sandbox / playground</span>
         </div>
       </div>
 
@@ -743,6 +748,8 @@
     box-shadow: var(--shadow-sm);
     transition: all var(--duration-normal) var(--ease-out);
     position: relative;
+    width: 100%;
+    min-width: 0;
   }
 
   .mock-card:hover {
@@ -778,6 +785,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
   }
 
   .mc-title {
@@ -833,6 +842,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100%;
+    max-width: 100%;
   }
 
   .ocr-canvas {

@@ -10,7 +10,7 @@
   import { fade } from 'svelte/transition';
   import type { CaptureType, CaptureStatus, Capture } from '$lib/db';
   import { registerShortcuts } from '$lib/shortcuts';
-  import { startOnboarding } from '$lib/onboarding';
+  import { startOnboarding, completeOnboarding } from '$lib/onboarding';
   import { settings, setAutoAiSearch } from '$lib/stores/settings';
   import { showToast } from '$lib/stores/toast';
   import { onMount } from 'svelte';
@@ -114,7 +114,11 @@
     ]);
     // Start onboarding tour for new users (no-op if already done)
     if (!$settings.onboardingDone) {
-      void startOnboarding();
+      if ($nonTrashedCaptures.length === 0) {
+        void startOnboarding();
+      } else {
+        void completeOnboarding();
+      }
     }
 
     // ── Handle Browser Extension params (auto-save, no modal) ──

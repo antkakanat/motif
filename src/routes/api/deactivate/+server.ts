@@ -1,21 +1,14 @@
 // ────────────────────────────────────────────────
-// POST /api/deactivate — LemonSqueezy Integration with Slot Release
+// POST /api/deactivate — LemonSqueezy Integration with Dynamic Proxying
 // ────────────────────────────────────────────────
 
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { kvGet, kvSet } from '$lib/server/kv';
 
-const KEY_REGEX = /^(MOTIF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}|[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12})$/;
-
-interface DeviceAllocation {
-  deviceId: string;
-  instanceId: string;
-  activatedAt: number;
-}
+const KEY_REGEX = /^[A-Z0-9-]{10,64}$/;
 
 export const POST: RequestHandler = async ({ request }) => {
-  let body: { licenseKey?: string; deviceId?: string };
+  let body: { licenseKey?: string; instanceId?: string };
 
   try {
     body = await request.json();
@@ -23,15 +16,11 @@ export const POST: RequestHandler = async ({ request }) => {
     throw error(400, 'Invalid JSON body');
   }
 
-  const { licenseKey, deviceId } = body;
+  const { licenseKey, instanceId } = body;
 
   // Validate inputs
   if (!licenseKey || typeof licenseKey !== 'string') {
     throw error(400, 'licenseKey is required');
-  }
-
-  if (!deviceId || typeof deviceId !== 'string') {
-    throw error(400, 'deviceId is required');
   }
 
   const normalized = licenseKey.toUpperCase().trim();
@@ -43,31 +32,21 @@ export const POST: RequestHandler = async ({ request }) => {
     }, { status: 422 });
   }
 
-  const kvKey = `license:${normalized}`;
-
   try {
-    // 1. Fetch allocations from KV
-    let allocations = (await kvGet<DeviceAllocation[]>(kvKey)) || [];
-
-    // 2. Find matching device
-    const deviceIndex = allocations.findIndex(a => a.deviceId === deviceId);
-
-    if (deviceIndex === -1) {
-      // Already deactivated or never existed
-      return json({ success: true, message: 'Device was not active.' });
-    }
-
-    const targetAllocation = allocations[deviceIndex];
-
-    // 3. Mock key handling bypasses real LemonSqueezy deactivation call
+    // 1. Mock key handling bypasses real LemonSqueezy deactivation call
     if (normalized.startsWith('MOTIF-TEST-')) {
-      // Just filter it out of KV
-      allocations.splice(deviceIndex, 1);
-      await kvSet(kvKey, allocations);
       return json({ success: true });
     }
 
-    // 4. Call LemonSqueezy deactivation API for real keys
+    // 2. If instanceId is missing (e.g. localStorage cleared), we return success to allow local cleanup
+    if (!instanceId || typeof instanceId !== 'string') {
+      return json({ 
+        success: true, 
+        message: 'No instance ID found locally. Device reset completed.' 
+      });
+    }
+
+    // 3. Call LemonSqueezy deactivation API for real keys
     const lsResponse = await fetch('https://api.lemonsqueezy.com/v1/licenses/deactivate', {
       method: 'POST',
       headers: {
@@ -76,14 +55,14 @@ export const POST: RequestHandler = async ({ request }) => {
       },
       body: new URLSearchParams({
         license_key: normalized,
-        instance_id: targetAllocation.instanceId
+        instance_id: instanceId
       })
     });
 
     const lsData = await lsResponse.json();
 
-    // Note: If LemonSqueezy deactivation returns a failure but the instance is already gone
-    // or key is inactive, we should still clean it up in our local tracking.
+    // If LemonSqueezy deactivation returns a failure but the instance is already gone
+    // or key is inactive, we should still return success to let the client clean up.
     const isSuccess = lsResponse.ok || lsData.error === 'Instance not found' || lsData.deactivated === true;
 
     if (!isSuccess) {
@@ -92,10 +71,6 @@ export const POST: RequestHandler = async ({ request }) => {
         error: lsData.error || 'Failed to deactivate license key on LemonSqueezy.'
       }, { status: 400 });
     }
-
-    // 5. Save updated allocations list in KV
-    allocations.splice(deviceIndex, 1);
-    await kvSet(kvKey, allocations);
 
     return json({ success: true });
   } catch (err) {

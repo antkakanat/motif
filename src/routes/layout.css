@@ -312,3 +312,32 @@ body::before {
   color: var(--color-text);
 }
 
+/* ────────────────────────────────────────────────
+   Accessibility Overrides (Reduced Motion)
+   ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .laser-scanner {
+    animation: none !important;
+  }
+  
+  .laser-scanner {
+    top: 50% !important;
+  }
+  
+  .skeleton,
+  .fade-in,
+  .slide-up,
+  .scale-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
+
+

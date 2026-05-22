@@ -503,7 +503,28 @@
           <input type="text" class="input" placeholder={t('pro.settings.activate.label')} bind:value={licenseKey} />
           <button class="btn-primary" onclick={handleActivate}>{t('pro.settings.activate.cta')}</button>
         </div>
-        {#if licenseError}<p class="error-text">{licenseError}</p>{/if}
+        {#if licenseError}
+          <div class="error-container" style="margin-top: 8px;">
+            <p class="error-text" style="margin: 0; color: #ef4444; font-size: 0.875rem;">{licenseError}</p>
+            {#if licenseError.toLowerCase().includes('limit') || licenseError.toLowerCase().includes('activation') || licenseError.toLowerCase().includes('slot') || licenseError.toLowerCase().includes('full')}
+              <div class="activation-lost-record" style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.15);">
+                <p class="setting-hint" style="margin: 0; font-size: 0.875rem; line-height: 1.4; color: var(--color-muted);">
+                  Can't find your activation record?<br />
+                  To free up a device slot, visit your LemonSqueezy receipt email and deactivate from there.
+                </p>
+                <a
+                  href="https://app.lemonsqueezy.com/my-orders"
+                  target="_blank"
+                  rel="noopener"
+                  class="portal-link"
+                  style="display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--color-primary); font-size: 0.875rem; font-weight: 500; text-decoration: none;"
+                >
+                  Open LemonSqueezy Portal →
+                </a>
+              </div>
+            {/if}
+          </div>
+        {/if}
         {#if licenseSuccess}<p class="success-text">{t('pro.settings.activate.success')}</p>{/if}
       {/if}
     </div>
