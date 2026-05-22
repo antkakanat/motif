@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { CHECKOUT_URLS } from '$lib/constants';
+  import { CHECKOUT_URLS, getCheckoutUrl } from '$lib/constants';
   import { settings, setAutoLockMinutes, setAutoOcr, setAutoFetchMetadata } from '$lib/stores/settings';
   import { db } from '$lib/db';
   import { runOcrOnCapture } from '$lib/stores/captures';
@@ -354,17 +354,7 @@
 
   function openCheckout(url: string, e: MouseEvent) {
     e.preventDefault();
-    let targetUrl = url;
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      try {
-        const urlObj = new URL(url);
-        urlObj.searchParams.set('preview', '1');
-        targetUrl = urlObj.toString();
-        console.log('LemonSqueezy Local Dev: automatically switching checkout to Test/Preview Mode:', targetUrl);
-      } catch (err) {
-        console.error('Failed to parse checkout URL for test mode:', err);
-      }
-    }
+    const targetUrl = getCheckoutUrl(url);
 
     if ((window as any).LemonSqueezy) {
       try {

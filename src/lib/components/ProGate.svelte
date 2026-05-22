@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { isProUnlocked, type ProFeature } from '$lib/pro';
-  import { CHECKOUT_URLS } from '$lib/constants';
+  import { CHECKOUT_URLS, getCheckoutUrl } from '$lib/constants';
 
   let {
     feature,
@@ -34,15 +34,16 @@
       class="gate-btn"
       onclick={(e) => {
         e.preventDefault();
+        const targetUrl = getCheckoutUrl(CHECKOUT_URLS.pro);
         if ((window as any).LemonSqueezy) {
           try {
-            (window as any).LemonSqueezy.Url.Open(CHECKOUT_URLS.pro);
+            (window as any).LemonSqueezy.Url.Open(targetUrl);
             return;
           } catch (err) {
             console.error('Failed to open LemonSqueezy overlay:', err);
           }
         }
-        window.open(CHECKOUT_URLS.pro, '_blank', 'noopener,noreferrer');
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
       }}
     >
       {t('pro.gate.cta')}
