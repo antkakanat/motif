@@ -26,3 +26,8 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 dev-dist
 
+# VS Code
+.vscode/
+
+# Scratch
+scratch/

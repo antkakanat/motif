@@ -38,4 +38,4 @@ This repository contains the source code for Motif.
 *   **Viewing and Learning:** You are welcome to explore the codebase, fork the repository on GitHub, and inspect the code for educational and privacy-verification purposes.
 *   **Restrictions:** **No commercial use, redistribution, or modification for public use is allowed.** You may not copy, reproduce, host, publish, or distribute any part of this source code or use the Motif name, logo, or assets for commercial projects without explicit written permission from the copyright owner.
 
-For licensing inquiries or partnerships, please contact: **support@byant.dev**
+For licensing inquiries or partnerships, please contact: **hello@byant.dev**

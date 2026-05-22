@@ -1,4 +1,4 @@
-# Motif Phasing Notes (Updated 2026-05-14)
+# Motif Phasing Notes (Updated 2026-05)
 
 ## Completed
 - Archive model implemented as inbox-style behavior:
@@ -56,14 +56,14 @@
    - offline reload
 5. Add visual regression snapshots for card header/status/type indicators.
 
-## Addendum (2026-05-14)
+## Addendum (2026-05)
 - Documentation handling note:
   - This file should be updated in append-only style for future phasing entries.
   - Keep historical entries and add new dated sections instead of replacing prior notes.
 - UI update approved and applied:
   - Added static "Private by default" badge near the All Captures header (non-animated).
 
-## Addendum (2026-05-14, PWA Clarification)
+## Addendum (2026-05, PWA Clarification)
 - Product decision confirmed:
   - PWA should work on any supported device/platform (iOS, Android, desktop browsers).
   - Service worker registration remains cross-platform (not iOS-only).
@@ -73,7 +73,7 @@
     - `beforeinstallprompt` flow for supported browsers.
     - iOS Safari manual "Share -> Add to Home Screen" guidance.
 
-## Addendum (2026-05-14, Card Tap + Selection + Hierarchy v2)
+## Addendum (2026-05, Card Tap + Selection + Hierarchy v2)
 - Implemented strict two-mode capture interactions (`browse` / `selection`) via selection store transitions.
 - Added long-press entry to selection mode with first-item selection, and preserved checkbox-based entry.
 - Implemented defined Shift-click behavior:
@@ -115,12 +115,12 @@
 - `npm run check` passes with no TypeScript/Svelte errors.
 - Production build compiles through Vite + PWA generation, but local adapter finalization fails on Windows symlink permission (`EPERM` at Vercel adapter step). This is environment-related and occurs after client/server build and service worker generation.
 
-## Addendum (2026-05-14, Nav Icon Consistency)
+## Addendum (2026-05, Nav Icon Consistency)
 - Replaced mixed symbol/emoji nav icons with a unified SVG icon set for visual consistency.
 - Updated mobile bottom nav, mobile More sheet, and desktop sidebar to use shared `NavIcon` component.
 - Standardized icon container sizing/alignment to remove perceived size mismatch across items.
 
-## Addendum (2026-05-15, PWA Install Button Research)
+## Addendum (2026-05, PWA Install Button Research)
 - Verified install-button model:
   - Android Chrome, desktop Chromium, and other Chromium-based browsers can use Motif's in-app install button when `beforeinstallprompt` fires.
   - Huawei/HarmonyOS devices should use the same path when their browser exposes the Chromium install prompt event.
@@ -129,7 +129,7 @@
   - Cleared the saved `beforeinstallprompt` event after calling `prompt()` because the event is one-use.
   - Temporarily suppress the install banner after a native prompt dismissal to avoid repeated prompts.
 
-## Addendum (2026-05-15, Settings Install Entry)
+## Addendum (2026-05, Settings Install Entry)
 - Added shared PWA install prompt state so the home install banner and Settings can use the same browser-provided install event.
 - Added Settings -> Install App section:
   - Shows native `Install Motif` action when `beforeinstallprompt` is available.
@@ -137,7 +137,7 @@
   - Shows platform-specific manual install guidance when native prompt access is unavailable.
 - Kept banner dismissal separate from Settings availability so users can still install later from Settings.
 
-## Addendum (2026-05-15, Phase A Pro Gate Hardening)
+## Addendum (2026-05, Phase A Pro Gate Hardening)
 - Policy reminder for local docs workflow:
   - `docs/phasing-notes.md` is append-only.
   - Never delete/replace previous entries; only add dated sections below.
@@ -163,7 +163,7 @@
 - Import flow hardening:
   - Gate checks run before opening import picker and again on import confirm.
 
-## Addendum (2026-05-20, Phase C: Offline PWA Fixes & Local OCR)
+## Addendum (2026-05, Phase C: Offline PWA Fixes & Local OCR)
 - Resolved offline PWA precaching and route resolution failures:
   - Configured SvelteKit prerendering configurations and adapter fallback setup to correctly bundle root app shell paths.
   - Ensured Web App manifest link tags and service worker precaching include correct asset hashes so that local data (embeddings, OCR, encrypted data) survives seamlessly across sessions.
@@ -187,7 +187,7 @@
 - Checked system reliability and compilation:
   - Run verification tasks yielding zero TypeScript or Svelte template compilation errors.
 
-## Addendum (2026-05-22, Phases F, G, H, Theme Hotfix & Pro Gate Hardening)
+## Addendum (2026-05, Phases F, G, H, Theme Hotfix & Pro Gate Hardening)
 
 ### Phase F — Smart Link Metadata Auto-Fetch
 - Implemented fully client-side link metadata fetch (`src/lib/metadata.ts`) with Google favicon and jsonlink.io integrations.
@@ -223,7 +223,7 @@
   - **Settings Panels**: Gated the AI Semantic Search and Auto-OCR checkboxes to gracefully prompt users to upgrade.
   - **Manual Trigger Points**: Gated the manual scan buttons ("Scan all now" in Settings, "Retry Scan" on Capture Cards, and manual OCR triggers inside Capture Modals) so Free tier trial expirations behave correctly.
 
-## Addendum (2026-05-22, Phase 3: Spatial Ambient Workspace & Direct Checkout Overlay)
+## Addendum (2026-05, Phase 3: Spatial Ambient Workspace & Direct Checkout Overlay)
 
 ### Spatial Ambient Theme & Workspace Dashboard
 - Implemented stacked GPU-accelerated radial drift meshes in `src/routes/layout.css` to create a beautiful, organic ambient background.
