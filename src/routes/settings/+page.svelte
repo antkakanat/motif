@@ -354,15 +354,27 @@
 
   function openCheckout(url: string, e: MouseEvent) {
     e.preventDefault();
+    let targetUrl = url;
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      try {
+        const urlObj = new URL(url);
+        urlObj.searchParams.set('preview', '1');
+        targetUrl = urlObj.toString();
+        console.log('LemonSqueezy Local Dev: automatically switching checkout to Test/Preview Mode:', targetUrl);
+      } catch (err) {
+        console.error('Failed to parse checkout URL for test mode:', err);
+      }
+    }
+
     if ((window as any).LemonSqueezy) {
       try {
-        (window as any).LemonSqueezy.Url.Open(url);
+        (window as any).LemonSqueezy.Url.Open(targetUrl);
         return;
       } catch (err) {
         console.error('Failed to open LemonSqueezy overlay:', err);
       }
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   }
 
   async function handleExport() {

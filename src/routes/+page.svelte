@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import { nonTrashedCaptures, addCapture, softDeleteCapture, updateCapture, type CreateCaptureInput } from '$lib/stores/captures';
+  import { nonTrashedCaptures, addCapture, softDeleteCapture, updateCapture, isLoading, type CreateCaptureInput } from '$lib/stores/captures';
   import { search, type SearchResult } from '$lib/search';
   import { clearSelection, selectAll } from '$lib/stores/selection';
   import CaptureCard from '$lib/components/CaptureCard.svelte';
@@ -112,14 +112,6 @@
         else clearSelection();
       }}
     ]);
-    // Start onboarding tour for new users (no-op if already done)
-    if (!$settings.onboardingDone) {
-      if ($nonTrashedCaptures.length === 0) {
-        void startOnboarding();
-      } else {
-        void completeOnboarding();
-      }
-    }
 
     // ── Handle Browser Extension params (auto-save, no modal) ──
     const extType = $page.url.searchParams.get('ext_type');
@@ -153,6 +145,19 @@
     }
 
     handleRouteParams();
+  });
+
+  // Start onboarding tour for new users ONLY after initial load completes and DOM is stable
+  $effect(() => {
+    if (!$isLoading) {
+      if (!$settings.onboardingDone) {
+        if ($nonTrashedCaptures.length === 0) {
+          void startOnboarding();
+        } else {
+          void completeOnboarding();
+        }
+      }
+    }
   });
 
   $effect(() => {
