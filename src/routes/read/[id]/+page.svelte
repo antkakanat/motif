@@ -6,6 +6,11 @@
   import ProGate from '$lib/components/ProGate.svelte';
   import { browser } from '$app/environment';
   import { assertProFeature, isFeatureAvailable } from '$lib/pro';
+  import { sessionKey } from '$lib/encryption';
+  import { decryptCapture } from '$lib/encryption';
+  import { settings } from '$lib/stores/settings';
+  import { updateCapture } from '$lib/stores/captures';
+  import { get } from 'svelte/store';
 
   const id = $page.params.id as string;
   let capture = $state<Capture | null>(null);
@@ -34,22 +39,59 @@
       width = localStorage.getItem('motif_read_width') || 'comfortable';
     }
 
-    // Load capture
-    capture = (await db.captures.get(id)) || null;
-    
-    if (!capture) {
-      error = 'Capture not found';
-      loading = false;
-      return;
-    }
+    await loadArticle();
+  });
 
-    if (capture.type !== 'link') {
-      error = 'Reading view is only available for links';
-      loading = false;
-      return;
-    }
+  async function loadArticle(forceRefresh = false) {
+    loading = true;
+    error = null;
+    content = null;
 
     try {
+      // 1. Get capture from Dexie
+      const rawCapture = (await db.captures.get(id)) || null;
+      if (!rawCapture) {
+        error = 'Capture not found';
+        loading = false;
+        return;
+      }
+
+      // 2. Decrypt if needed
+      if (get(settings).dbEncrypted) {
+        const key = get(sessionKey);
+        if (key) {
+          try {
+            capture = await decryptCapture(rawCapture, key);
+          } catch (e) {
+            console.error("Decrypt failed", e);
+            capture = rawCapture;
+          }
+        } else {
+          capture = rawCapture;
+        }
+      } else {
+        capture = rawCapture;
+      }
+
+      if (capture.type !== 'link') {
+        error = 'Reading view is only available for links';
+        loading = false;
+        return;
+      }
+
+      // 3. Check if cached locally & not forceRefresh
+      if (capture.readableHtml && !forceRefresh) {
+        content = {
+          content: capture.readableHtml,
+          title: capture.readableTitle || capture.title,
+          byline: capture.readableByline || '',
+          siteName: capture.readableSiteName || ''
+        };
+        loading = false;
+        return;
+      }
+
+      // 4. Otherwise, fetch from Read API and cache it
       const res = await fetch(`/api/read?url=${encodeURIComponent(capture.content)}`);
       if (!res.ok) {
         let errMessage = 'Failed to fetch clean version';
@@ -61,14 +103,56 @@
         }
         throw new Error(errMessage);
       }
-      content = await res.json();
+
+      const cleanArticle = await res.json();
+      if (!cleanArticle || !cleanArticle.content) {
+        throw new Error('No readable content extracted');
+      }
+
+      content = cleanArticle;
+
+      // 5. Write back to Dexie cache using updateCapture
+      const textOnly = cleanArticle.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      await updateCapture(capture.id, {
+        readableHtml: cleanArticle.content,
+        readableText: textOnly,
+        readableTitle: cleanArticle.title || '',
+        readableByline: cleanArticle.byline || '',
+        readableSiteName: cleanArticle.siteName || '',
+        archivedAt: new Date().toISOString(),
+        archiveStatus: 'done',
+        archiveError: undefined
+      });
+
+      // Reload capture reference
+      const updatedRaw = await db.captures.get(id);
+      if (updatedRaw) {
+        if (get(settings).dbEncrypted) {
+          const key = get(sessionKey);
+          if (key) {
+            capture = await decryptCapture(updatedRaw, key);
+          } else {
+            capture = updatedRaw;
+          }
+        } else {
+          capture = updatedRaw;
+        }
+      }
+
     } catch (err: any) {
-      error = err.message;
+      error = err.message || String(err);
       console.error("Read View Error:", err);
+      // Mark as failed in DB if not already
+      if (capture) {
+        await updateCapture(capture.id, {
+          archiveStatus: 'failed',
+          archiveError: err.message || String(err)
+        });
+      }
     } finally {
       loading = false;
     }
-  });
+  }
 
   function toggleFont() {
     font = font === 'sans' ? 'serif' : 'sans';
@@ -107,6 +191,9 @@
         <button class="control-btn" onclick={toggleWidth} title="Toggle Width">
           {width === 'comfortable' ? '⬌' : '↔'}
         </button>
+        <button class="control-btn refresh-btn" onclick={() => loadArticle(true)} title="Refresh Cache">
+          🔄 Refresh
+        </button>
       </div>
     {/if}
 
@@ -137,9 +224,14 @@
           <h2 class="error-title">Could not load reading view</h2>
           <p class="error-desc">{error}</p>
           {#if capture}
-            <a href={capture.content} target="_blank" rel="noopener" class="btn btn-primary">
-              Open Original Website
-            </a>
+            <div style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 16px;">
+              <button class="btn btn-primary" onclick={() => loadArticle(true)} style="background: var(--color-primary); color: white; border: none; padding: 10px 20px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer;">
+                Retry Offline Archiving
+              </button>
+              <a href={capture.content} target="_blank" rel="noopener" class="btn btn-secondary" style="border: 1px solid var(--color-border); padding: 9px 19px; border-radius: var(--radius-md); text-decoration: none; color: var(--color-text); font-weight: 500; display: inline-flex; align-items: center; background: transparent;">
+                Open Original Website
+              </a>
+            </div>
           {/if}
         </div>
       {:else if content}
@@ -208,6 +300,7 @@
     padding: 2px;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
+    align-items: center;
   }
 
   .control-btn {
@@ -225,6 +318,13 @@
   .control-btn:hover {
     color: var(--color-text);
     background: var(--color-bg);
+  }
+
+  .refresh-btn {
+    border-left: 1px solid var(--color-border);
+    border-radius: 0;
+    margin-left: 2px;
+    padding-left: 8px;
   }
 
   .header-spacer { flex: 1; }

@@ -1,13 +1,14 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { shouldShowBackupReminder } from '$lib/stores/settings';
+  import { captures } from '$lib/stores/captures';
   import { goto } from '$app/navigation';
 
   let dismissed = $state(false);
 
   let visible = $derived.by(() => {
     if (dismissed) return false;
-    return shouldShowBackupReminder();
+    return shouldShowBackupReminder($captures);
   });
 </script>
 

@@ -9,7 +9,7 @@ let miniSearch: MiniSearch<Capture>;
 
 function createIndex(): MiniSearch<Capture> {
   return new MiniSearch<Capture>({
-    fields: ['title', 'content', 'ogTitle', 'ocrText'],
+    fields: ['title', 'content', 'ogTitle', 'ocrText', 'readableText'],
     storeFields: ['id'],
     searchOptions: {
       fuzzy: 0.2,
@@ -18,7 +18,8 @@ function createIndex(): MiniSearch<Capture> {
         title: 3,
         ogTitle: 2,
         content: 1,
-        ocrText: 1
+        ocrText: 1,
+        readableText: 0.8
       }
     },
     // Extract tags as additional searchable text

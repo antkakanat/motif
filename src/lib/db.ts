@@ -31,6 +31,15 @@ export interface Capture {
   // Phase G — Reminders
   reminderAt: string | null;    // ISO timestamp, null = no reminder
   reminderDone: boolean;         // true once notification has fired
+  // Offline Reading View Cache
+  readableHtml?: string;
+  readableText?: string;
+  readableTitle?: string;
+  readableByline?: string;
+  readableSiteName?: string;
+  archivedAt?: string;
+  archiveStatus?: 'none' | 'pending' | 'done' | 'failed';
+  archiveError?: string;
 }
 
 export interface Collection {

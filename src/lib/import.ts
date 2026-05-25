@@ -1,5 +1,5 @@
 import { unzip, strFromU8 } from 'fflate';
-import { db, type Capture, type Collection, type Tag } from '$lib/db';
+import { db, generateId, now, type Capture, type Collection, type Tag } from '$lib/db';
 import { loadCaptures } from '$lib/stores/captures';
 import { loadCollections } from '$lib/stores/collections';
 
@@ -23,7 +23,138 @@ const MIME_MAP: Record<string, string> = {
   gif: 'image/gif'
 };
 
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    let hostname = u.hostname.toLowerCase();
+    if (hostname.startsWith('www.')) {
+      hostname = hostname.substring(4);
+    }
+    let pathname = u.pathname;
+    if (pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    }
+    return `${hostname}${pathname}${u.search}`;
+  } catch {
+    return url.toLowerCase().trim().replace(/\/$/, '');
+  }
+}
+
+export async function analyzePocketImport(file: File): Promise<ImportAnalysis> {
+  const htmlText = await file.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, 'text/html');
+
+  const uls = doc.querySelectorAll('ul');
+  if (uls.length === 0) {
+    throw new Error('Invalid file format. No link lists found in the HTML.');
+  }
+
+  // Load existing links for deduplication
+  const existingLinks = await db.captures.where('type').equals('link').toArray();
+  const existingNormalized = new Set(existingLinks.map(c => normalizeUrl(c.content)));
+
+  const incomingCaptures: Capture[] = [];
+  const incomingNormalized = new Set<string>();
+  let duplicates = 0;
+  const tagSet = new Set<string>();
+
+  for (const ul of uls) {
+    let prev = ul.previousElementSibling;
+    while (prev && !['H1', 'H2', 'H3', 'H4'].includes(prev.tagName)) {
+      prev = prev.previousElementSibling;
+    }
+    const headingTextClean = prev ? prev.textContent?.trim().toLowerCase() : '';
+    const isArchived = (headingTextClean.includes('archive') || headingTextClean.includes('read')) && !headingTextClean.includes('unread');
+    const status = isArchived ? 'archived' : 'unread'; // 'unread' maps to Inbox/Unread
+
+    const links = ul.querySelectorAll('a');
+    for (const a of links) {
+      const href = a.getAttribute('href');
+      if (!href) continue;
+
+      const norm = normalizeUrl(href);
+      if (existingNormalized.has(norm) || incomingNormalized.has(norm)) {
+        duplicates++;
+        continue;
+      }
+
+      incomingNormalized.add(norm);
+
+      const timeAddedAttr = a.getAttribute('time_added');
+      let createdAt = now();
+      if (timeAddedAttr) {
+        const secs = parseInt(timeAddedAttr, 10);
+        if (!isNaN(secs)) {
+          createdAt = new Date(secs * 1000).toISOString();
+        }
+      }
+
+      const tagsAttr = a.getAttribute('tags');
+      const tags = tagsAttr ? tagsAttr.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0) : [];
+      for (const t of tags) tagSet.add(t);
+
+      const capture: Capture = {
+        id: generateId(),
+        type: 'link',
+        status: status as any,
+        title: a.textContent?.trim() || 'Untitled Link',
+        content: href,
+        ogImage: null,
+        ogTitle: null,
+        favicon: null,
+        description: null,
+        tags: tags,
+        collectionId: null,
+        isTrashed: false,
+        trashedAt: null,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+        ocrText: null,
+        sourceUrl: null,
+        reminderAt: null,
+        reminderDone: false,
+        archiveStatus: 'none'
+      };
+
+      incomingCaptures.push(capture);
+    }
+  }
+
+  // Create Tag entities
+  const incomingTags: Tag[] = Array.from(tagSet).map(name => ({
+    id: generateId(),
+    name,
+    createdAt: now()
+  }));
+
+  const envelope = {
+    version: '1',
+    captures: incomingCaptures,
+    collections: [],
+    tags: incomingTags,
+    isPocketImport: true
+  };
+
+  return {
+    envelope,
+    images: {},
+    stats: {
+      totalCaptures: incomingCaptures.length + duplicates,
+      totalCollections: 0,
+      totalTags: incomingTags.length,
+      duplicateCaptures: duplicates,
+      newCaptures: incomingCaptures.length
+    }
+  };
+}
+
 export async function analyzeImport(file: File): Promise<ImportAnalysis> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.html') || name.endsWith('.htm')) {
+    return analyzePocketImport(file);
+  }
+
   return new Promise((resolve, reject) => {
     file.arrayBuffer().then(buffer => {
       unzip(new Uint8Array(buffer), async (err, unzipped) => {
@@ -33,39 +164,39 @@ export async function analyzeImport(file: File): Promise<ImportAnalysis> {
           const dataJsonU8 = unzipped['data.json'];
           if (!dataJsonU8) return reject(new Error('Invalid backup: data.json is missing.'));
 
-        let envelope;
-        try {
-          envelope = JSON.parse(strFromU8(dataJsonU8));
-        } catch (e) {
-          return reject(new Error('Invalid backup: data.json is corrupted.'));
-        }
-
-        // Schema version check
-        const currentVersion = 1;
-        const backupVersion = parseInt(envelope.version, 10);
-        if (isNaN(backupVersion) || backupVersion > currentVersion) {
-          return reject(new Error('This backup was made with a newer version of Motif. Please update the app first.'));
-        }
-
-        // Extract images
-        const images: Record<string, Uint8Array> = {};
-        for (const [path, data] of Object.entries(unzipped)) {
-          if (path.startsWith('images/') && data.length > 0) {
-            const fileName = path.split('/')[1];
-            images[fileName] = data;
+          let envelope;
+          try {
+            envelope = JSON.parse(strFromU8(dataJsonU8));
+          } catch (e) {
+            return reject(new Error('Invalid backup: data.json is corrupted.'));
           }
-        }
 
-        // Calculate overlap
-        const existingKeys = new Set(await db.captures.toCollection().primaryKeys());
-        let duplicates = 0;
-        const incomingCaptures = envelope.captures || [];
-        
-        for (const c of incomingCaptures) {
-          if (existingKeys.has(c.id)) {
-            duplicates++;
+          // Schema version check
+          const currentVersion = 1;
+          const backupVersion = parseInt(envelope.version, 10);
+          if (isNaN(backupVersion) || backupVersion > currentVersion) {
+            return reject(new Error('This backup was made with a newer version of Motif. Please update the app first.'));
           }
-        }
+
+          // Extract images
+          const images: Record<string, Uint8Array> = {};
+          for (const [path, data] of Object.entries(unzipped)) {
+            if (path.startsWith('images/') && data.length > 0) {
+              const fileName = path.split('/')[1];
+              images[fileName] = data;
+            }
+          }
+
+          // Calculate overlap
+          const existingKeys = new Set(await db.captures.toCollection().primaryKeys());
+          let duplicates = 0;
+          const incomingCaptures = envelope.captures || [];
+          
+          for (const c of incomingCaptures) {
+            if (existingKeys.has(c.id)) {
+              duplicates++;
+            }
+          }
 
           resolve({
             envelope,
@@ -119,7 +250,7 @@ export async function executeImport(
   }
 
   // Database Transaction
-  await db.transaction('rw', db.captures, db.collections, db.tags, async () => {
+  await db.transaction('rw', db.captures, db.collections, db.tags, db.settings, async () => {
     // Tags and Collections are always upserted (they merge cleanly by ID)
     if (tags.length > 0) await db.tags.bulkPut(tags);
     if (collections.length > 0) await db.collections.bulkPut(collections);
@@ -137,9 +268,19 @@ export async function executeImport(
         }
       }
     }
+
+    if (envelope.isPocketImport) {
+      // Initialize libraryStartedAt to prevent immediate backup prompt only if not already set
+      const existing = await db.settings.get('libraryStartedAt');
+      if (!existing) {
+        await db.settings.put({ key: 'libraryStartedAt', value: now() });
+      }
+    }
   });
 
   // Reactive Reload
+  const { loadSettings } = await import('$lib/stores/settings');
+  await loadSettings();
   await loadCollections();
   await loadCaptures();
 }

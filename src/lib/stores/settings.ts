@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────
 
 import { writable, get } from 'svelte/store';
-import { db, type AppSettings } from '$lib/db';
+import { db, type AppSettings, type Capture } from '$lib/db';
 import { browser } from '$app/environment';
 
 // ── Settings keys ──
@@ -18,7 +18,13 @@ const KEYS = {
   AUTO_OCR: 'autoOcr',
   AUTO_AI_SEARCH: 'autoAiSearch',
   DB_ENCRYPTED: 'dbEncrypted',
-  AUTO_FETCH_METADATA: 'autoFetchMetadata'
+  AUTO_FETCH_METADATA: 'autoFetchMetadata',
+  VIEW_MODE: 'viewMode',
+  DENSITY: 'density',
+  SORT_MODE: 'sortMode',
+  LIBRARY_STARTED_AT: 'libraryStartedAt',
+  AUTO_ARCHIVE_ARTICLES: 'autoArchiveArticles',
+  ARCHIVE_SIZE_LIMIT: 'archiveSizeLimit'
 } as const;
 
 // ── Settings store ──
@@ -35,6 +41,12 @@ interface SettingsState {
   autoAiSearch: boolean;
   dbEncrypted: boolean;
   autoFetchMetadata: boolean;
+  viewMode: 'cards' | 'compact' | 'table';
+  density: 'comfortable' | 'compact';
+  sortMode: 'newest' | 'oldest' | 'alphabetical' | 'relevance';
+  libraryStartedAt: string | null;
+  autoArchiveArticles: boolean;
+  archiveSizeLimit: 'unlimited' | '50mb' | '100mb' | '250mb';
 }
 
 const defaultSettings: SettingsState = {
@@ -48,7 +60,13 @@ const defaultSettings: SettingsState = {
   autoOcr: true,
   autoAiSearch: false,
   dbEncrypted: false,
-  autoFetchMetadata: true
+  autoFetchMetadata: true,
+  viewMode: 'cards',
+  density: 'comfortable',
+  sortMode: 'newest',
+  libraryStartedAt: null,
+  autoArchiveArticles: false,
+  archiveSizeLimit: '100mb'
 };
 
 export const settings = writable<SettingsState>({ ...defaultSettings });
@@ -95,6 +113,24 @@ export async function loadSettings(): Promise<void> {
         break;
       case KEYS.AUTO_FETCH_METADATA:
         state.autoFetchMetadata = row.value === 'true';
+        break;
+      case KEYS.VIEW_MODE:
+        state.viewMode = row.value as any;
+        break;
+      case KEYS.DENSITY:
+        state.density = row.value as any;
+        break;
+      case KEYS.SORT_MODE:
+        state.sortMode = row.value as any;
+        break;
+      case KEYS.LIBRARY_STARTED_AT:
+        state.libraryStartedAt = row.value;
+        break;
+      case KEYS.AUTO_ARCHIVE_ARTICLES:
+        state.autoArchiveArticles = row.value === 'true';
+        break;
+      case KEYS.ARCHIVE_SIZE_LIMIT:
+        state.archiveSizeLimit = row.value as any;
         break;
     }
   }
@@ -146,9 +182,28 @@ export async function markBackupDone(): Promise<void> {
   settings.update((s) => ({ ...s, lastBackupAt: timestamp }));
 }
 
-export function shouldShowBackupReminder(): boolean {
+export function shouldShowBackupReminder(capturesList: Capture[]): boolean {
+  const activeCaptures = capturesList.filter(c => !c.isTrashed);
+  if (activeCaptures.length === 0) return false;
+
   const state = get(settings);
-  if (!state.lastBackupAt) return true; // Never backed up
+  let startTimestamp: number | null = null;
+
+  if (state.libraryStartedAt) {
+    startTimestamp = new Date(state.libraryStartedAt).getTime();
+  } else {
+    const oldest = activeCaptures.reduce((min, c) => c.createdAt < min ? c.createdAt : min, activeCaptures[0].createdAt);
+    if (oldest) {
+      startTimestamp = new Date(oldest).getTime();
+    }
+  }
+
+  if (startTimestamp === null) return false;
+
+  const threeDays = 3 * 24 * 60 * 60 * 1000;
+  if (Date.now() - startTimestamp < threeDays) return false;
+
+  if (!state.lastBackupAt) return true;
   const lastBackup = new Date(state.lastBackupAt).getTime();
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
   return Date.now() - lastBackup > thirtyDays;
@@ -186,6 +241,40 @@ export async function setDbEncrypted(enabled: boolean): Promise<void> {
 export async function setAutoFetchMetadata(enabled: boolean): Promise<void> {
   await saveSetting(KEYS.AUTO_FETCH_METADATA, String(enabled));
   settings.update((s) => ({ ...s, autoFetchMetadata: enabled }));
+}
+
+export async function setViewMode(mode: 'cards' | 'compact' | 'table'): Promise<void> {
+  await saveSetting(KEYS.VIEW_MODE, mode);
+  settings.update((s) => ({ ...s, viewMode: mode }));
+}
+
+export async function setDensity(density: 'comfortable' | 'compact'): Promise<void> {
+  await saveSetting(KEYS.DENSITY, density);
+  settings.update((s) => ({ ...s, density }));
+}
+
+export async function setSortMode(sortMode: 'newest' | 'oldest' | 'alphabetical' | 'relevance'): Promise<void> {
+  await saveSetting(KEYS.SORT_MODE, sortMode);
+  settings.update((s) => ({ ...s, sortMode }));
+}
+
+export async function setAutoArchiveArticles(enabled: boolean): Promise<void> {
+  await saveSetting(KEYS.AUTO_ARCHIVE_ARTICLES, String(enabled));
+  settings.update((s) => ({ ...s, autoArchiveArticles: enabled }));
+}
+
+export async function setArchiveSizeLimit(limit: 'unlimited' | '50mb' | '100mb' | '250mb'): Promise<void> {
+  await saveSetting(KEYS.ARCHIVE_SIZE_LIMIT, limit);
+  settings.update((s) => ({ ...s, archiveSizeLimit: limit }));
+}
+
+export async function setLibraryStartedAt(timestamp: string | null): Promise<void> {
+  if (timestamp === null) {
+    await db.settings.delete(KEYS.LIBRARY_STARTED_AT);
+  } else {
+    await saveSetting(KEYS.LIBRARY_STARTED_AT, timestamp);
+  }
+  settings.update((s) => ({ ...s, libraryStartedAt: timestamp }));
 }
 
 // ── Onboarding ──

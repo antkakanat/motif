@@ -243,3 +243,40 @@
 ### Verification & SEO Audit
 - Upgraded `src/app.html` with modern semantic fallback headers, complete OpenGraph and Twitter cards previewing `/screenshots/desktop.png` to maximize social sharing conversions.
 - Validated the entire application using `npm run check`, completing successfully with zero TypeScript or Svelte compiler errors. Verified Vite client and server compiles through successful production build pipeline targets.
+
+## Addendum (2026-05, Phase 2 Implementation & Stabilization Pass)
+
+### Scalable View Modes (Cards, Compact List, Table)
+- Consolidated all duplicate grid lists, toolbars, and category pages into a single, high-performance, reusable display orchestrator `CaptureBrowser.svelte`.
+- Created `CaptureCompactItem.svelte` to serve as a fast list-based layout featuring left checkboxes, tag badges, overdue status flags, and right thumbnails.
+- Created `CaptureTableRow.svelte` as a semantic HTML table grid for desktop, which collapses smoothly to the compact list layout on screens narrower than `768px` using responsive width triggers.
+- Added persisted preference controls in settings (`viewMode`, `density`, `sortMode`) to ensure users' layouts remain consistent between reloads.
+
+### Local Article Archiving (Offline Reading View)
+- Upgraded the database schema (`Capture` interface in `db.ts`) with cache fields (`readableHtml`, `readableText`, `readableTitle`, `readableByline`, `readableSiteName`, `archivedAt`, and `archiveStatus`).
+- Updated BIP-39 / AES-256-GCM cryptography stores in `encryption.ts` to encrypt and decrypt all offline article caches in volatile memory, maintaining a zero-knowledge local stance.
+- Integrated background archiving in `captures.ts` using a 5-second queue delay to avoid wasted requests during fast deletions.
+- Rewrote the reader route at `/read/[id]` to render from IndexedDB cache offline with a retry UI on failure and refresh controls.
+- Added setting controls under settings page: toggle option, cache limits, storage tracker, and a "Clear article cache" action.
+
+### Pocket HTML Import (Portability & Migration)
+- Shipped a native, client-side DOM HTML parser (`analyzePocketImport`) inside `import.ts` mapping Pocket export lists directly to IndexedDB.
+- Generalized the settings file selector in `+page.svelte` to accept `.zip`, `.html`, and `.htm` file extensions.
+
+### First-Run UX & Backup Timing
+- Implemented `libraryStartedAt` initialization logic on fresh account saves or Pocket imports to prevent intrusive day-zero backup prompts.
+- Refactored `shouldShowBackupReminder` to defer prompt visibility for the first 3 days of library activity, with a fallback using the oldest capture timestamp for legacy users.
+
+### Stabilization Pass & Regression Fixes
+- **Pocket Unread Segregation**: Refactored heading classification in `import.ts` to explicitly check for `"archive"` or `"read"` headings while strictly excluding `"unread"` case-insensitively, ensuring unread imports go to the inbox instead of getting archived.
+- **Deep-linking & FAB Restoration**: Restored `new`, `focus`, and `status` parameter deep-links, browser extension saves, and PWA Share Target sheet captures in `CaptureBrowser.svelte`.
+- **Landing Page Bypassing**: Added a derived `hasDeepLink` checker in `+page.svelte` to reactively bypass `LandingPage` and mount the capture database immediately when a deep-link is active.
+- **Keyboard Shortcuts**: Re-registered standard shortcuts (`Ctrl+K`, `Ctrl+F`, `Shift+A`, `Escape`) inside `CaptureBrowser.svelte`'s onMount hook.
+- **Opt-In Privacy Defaults**: Configured `autoArchiveArticles` to default to `false` (disabled) inside settings to guarantee complete privacy until explicit user consent is given.
+- **Dynamic Type-Route Locking**: Passed `lockTab={!showTypeFilter}` to `<CaptureModal>` to lock the active capture type on sub-routes `/links`, `/notes`, etc., and hide type-switcher headers completely.
+- **Backup Countdown Preservation**: Refactored Pocket import transaction to only initialize `libraryStartedAt` if it is currently unset, preventing reset of backup intervals for active users.
+
+### Verification
+- Ran full `npm run check` verification with `0 errors and 15 warnings` (fully clean Type-safe Svelte compiler status).
+- Verified production build completes all bundle creation steps cleanly.
+

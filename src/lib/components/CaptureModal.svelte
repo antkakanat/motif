@@ -40,12 +40,14 @@
     open = $bindable(false),
     onSave,
     defaultTab = 'link' as Tab,
-    initialData = null as InitialData | null
+    initialData = null as InitialData | null,
+    lockTab = false
   }: {
     open: boolean;
     onSave: (data: CaptureFormData) => void | Promise<void>;
     defaultTab?: Tab;
     initialData?: InitialData | null;
+    lockTab?: boolean;
   } = $props();
 
   let unlocked = $derived(isProUnlocked());
@@ -289,23 +291,25 @@
   <div class="modal-backdrop" onclick={handleBackdropClick} role="presentation">
     <div class="modal scale-in" role="dialog" aria-modal="true" aria-label={t('capture.addNew')}>
       <!-- Tab bar -->
-      <div class="modal-tabs">
-        {#each tabs as tab}
-          <button
-            class="modal-tab"
-            class:active={activeTab === tab.key}
-            onclick={() => { 
-              if (activeTab !== tab.key) {
-                activeTab = tab.key; 
-                reset(); 
-              }
-            }}
-          >
-            <span class="tab-icon"><NavIcon name={tab.icon} size={15} strokeWidth={2} /></span>
-            <span class="tab-label">{tab.label}</span>
-          </button>
-        {/each}
-      </div>
+      {#if !lockTab}
+        <div class="modal-tabs">
+          {#each tabs as tab}
+            <button
+              class="modal-tab"
+              class:active={activeTab === tab.key}
+              onclick={() => { 
+                if (activeTab !== tab.key) {
+                  activeTab = tab.key; 
+                  reset(); 
+                }
+              }}
+            >
+              <span class="tab-icon"><NavIcon name={tab.icon} size={15} strokeWidth={2} /></span>
+              <span class="tab-label">{tab.label}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
 
       <!-- Form body -->
       <div class="modal-body">

@@ -82,9 +82,9 @@
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={handleBackdropClick} transition:fade={{ duration: 150 }} role="presentation">
-    <div class="modal scale-in" role="dialog" aria-modal="true" aria-label="Import Backup">
+    <div class="modal scale-in" role="dialog" aria-modal="true" aria-label="Import Backup or Pocket Export">
       <div class="modal-header">
-        <h2 class="modal-title">Import Backup</h2>
+        <h2 class="modal-title">Import Backup or Pocket Export</h2>
         <button class="btn-close" onclick={close} disabled={isImporting}>×</button>
       </div>
 
@@ -98,7 +98,7 @@
         {:else if isAnalyzing}
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Analyzing backup file...</p>
+            <p>Analyzing import file...</p>
           </div>
         {:else if error}
           <div class="error-box">

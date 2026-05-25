@@ -7,7 +7,7 @@ import { db, generateId, now, type Capture, type CaptureType, type CaptureStatus
 import { rebuildSearchIndex } from '$lib/search';
 import { isOnboardingDone, completeOnboarding } from '$lib/onboarding';
 import { isProUnlocked } from '$lib/pro';
-import { settings } from '$lib/stores/settings';
+import { settings, setLibraryStartedAt } from '$lib/stores/settings';
 import { activeOcrRuns } from '$lib/ocr';
 import { showToast } from '$lib/stores/toast';
 import { indexCaptureSingle } from '$lib/stores/semanticSearch';
@@ -107,6 +107,9 @@ export interface CreateCaptureInput {
 }
 
 export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
+  const isLink = input.type === 'link';
+  const autoArchive = get(settings).autoArchiveArticles && isProUnlocked();
+
   const capture: Capture = {
     id: generateId(),
     type: input.type,
@@ -127,7 +130,8 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
     ocrStatus: input.type === 'image' ? 'pending' : undefined,
     sourceUrl: input.sourceUrl ?? null,
     reminderAt: input.reminderAt ?? null,
-    reminderDone: false
+    reminderDone: false,
+    archiveStatus: isLink ? (autoArchive ? 'pending' : 'none') : undefined
   };
 
   // Encrypt record if database is encrypted
@@ -148,6 +152,11 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
   captures.update((list) => [...list, capture]);
   rebuildSearchIndex(get(captures));
 
+  // Initialize libraryStartedAt if empty
+  if (!get(settings).libraryStartedAt) {
+    void setLibraryStartedAt(now());
+  }
+
   // Dismiss onboarding permanently on first real capture
   if (!isOnboardingDone()) {
     await completeOnboarding();
@@ -156,6 +165,16 @@ export async function addCapture(input: CreateCaptureInput): Promise<Capture> {
   // Save first, enrich in background (respects autoFetchMetadata privacy setting).
   if (capture.type === 'link' && get(settings).autoFetchMetadata) {
     void fetchMetadataForCapture(capture.id, capture.content);
+  }
+
+  // Queue background article archiving with 5-second delay if enabled
+  if (isLink && autoArchive) {
+    setTimeout(() => {
+      const current = get(captures).find((c) => c.id === capture.id);
+      if (current && !current.isTrashed) {
+        void archiveArticleForCapture(capture.id, capture.content);
+      }
+    }, 5000);
   }
 
   // Trigger OCR in background for images
@@ -188,6 +207,12 @@ export async function updateCapture(id: string, changes: Partial<Capture>): Prom
         const serializedTags = JSON.stringify(updates.tags);
         encryptedUpdates.tags = ['enc_json:' + await encryptText(serializedTags, key)];
       }
+      if (updates.readableHtml) encryptedUpdates.readableHtml = 'enc:' + await encryptText(updates.readableHtml, key);
+      if (updates.readableText) encryptedUpdates.readableText = 'enc:' + await encryptText(updates.readableText, key);
+      if (updates.readableTitle) encryptedUpdates.readableTitle = 'enc:' + await encryptText(updates.readableTitle, key);
+      if (updates.readableByline) encryptedUpdates.readableByline = 'enc:' + await encryptText(updates.readableByline, key);
+      if (updates.readableSiteName) encryptedUpdates.readableSiteName = 'enc:' + await encryptText(updates.readableSiteName, key);
+      if (updates.archiveError) encryptedUpdates.archiveError = 'enc:' + await encryptText(updates.archiveError, key);
       dbUpdates = encryptedUpdates;
     }
   }
@@ -610,4 +635,111 @@ export async function bulkMoveToCollection(ids: string[], collectionId: string |
   captures.update((list) =>
     list.map((c) => ids.includes(c.id) ? { ...c, collectionId, updatedAt: t } : c)
   );
+}
+
+// ── Offline Article Archiving ──
+
+export async function archiveArticleForCapture(id: string, url: string): Promise<void> {
+  const current = get(captures).find((capture) => capture.id === id);
+  if (!current || current.isTrashed) return;
+
+  await updateCapture(id, { archiveStatus: 'pending', archiveError: undefined });
+
+  try {
+    const res = await fetch(`/api/read?url=${encodeURIComponent(url)}`);
+    if (!res.ok) {
+      let errMessage = `Server returned status ${res.status}`;
+      try {
+        const data = await res.json();
+        errMessage = data.message || errMessage;
+      } catch {}
+      throw new Error(errMessage);
+    }
+    
+    const cleanArticle = await res.json();
+    if (!cleanArticle || !cleanArticle.content) {
+      throw new Error('No readable content extracted');
+    }
+
+    // Check storage limits
+    const settingsState = get(settings);
+    if (settingsState.archiveSizeLimit !== 'unlimited') {
+      const limitBytes = settingsState.archiveSizeLimit === '50mb' ? 50 * 1024 * 1024
+                       : settingsState.archiveSizeLimit === '100mb' ? 100 * 1024 * 1024
+                       : 250 * 1024 * 1024;
+      
+      const currentSize = await getArticleCacheSize();
+      if (currentSize + cleanArticle.content.length > limitBytes) {
+        throw new Error(`Archive size limit of ${settingsState.archiveSizeLimit} reached`);
+      }
+    }
+
+    const textOnly = stripHtmlTags(cleanArticle.content);
+
+    await updateCapture(id, {
+      readableHtml: cleanArticle.content,
+      readableText: textOnly,
+      readableTitle: cleanArticle.title || '',
+      readableByline: cleanArticle.byline || '',
+      readableSiteName: cleanArticle.siteName || '',
+      archivedAt: now(),
+      archiveStatus: 'done',
+      archiveError: undefined
+    });
+  } catch (err: any) {
+    console.error('Offline Archiving failed:', err);
+    await updateCapture(id, {
+      archiveStatus: 'failed',
+      archiveError: err.message || String(err)
+    });
+  }
+}
+
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export async function getArticleCacheSize(): Promise<number> {
+  const all = await db.captures.toArray();
+  let total = 0;
+  for (const c of all) {
+    let readable = c;
+    if (get(settings).dbEncrypted) {
+      const key = get(sessionKey);
+      if (key) {
+        try {
+          const { decryptCapture } = await import('$lib/encryption');
+          readable = await decryptCapture(c, key);
+        } catch {}
+      }
+    }
+    if (readable.readableHtml) total += readable.readableHtml.length;
+    if (readable.readableText) total += readable.readableText.length;
+  }
+  return total;
+}
+
+export async function clearArticleCache(): Promise<void> {
+  const all = get(captures);
+  await db.transaction('rw', db.captures, async () => {
+    for (const c of all) {
+      if (c.readableHtml || c.readableText || c.archiveStatus === 'done' || c.archiveStatus === 'failed') {
+        const updates: any = {
+          readableHtml: null,
+          readableText: null,
+          readableTitle: null,
+          readableByline: null,
+          readableSiteName: null,
+          archivedAt: null,
+          archiveStatus: 'none',
+          archiveError: null,
+          updatedAt: now()
+        };
+        // If encrypted, these fields should be written as null without encryption since they're deleted
+        await db.captures.update(c.id, updates);
+      }
+    }
+  });
+
+  await loadCaptures();
 }

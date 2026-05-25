@@ -2,32 +2,16 @@
   import { page } from '$app/stores';
   import { t } from '$lib/i18n';
   import { collections, updateCollection, deleteCollection } from '$lib/stores/collections';
-  import { activeCaptures, softDeleteCapture, updateCapture, addCapture, type CreateCaptureInput } from '$lib/stores/captures';
-  import { clearSelection, selectAll } from '$lib/stores/selection';
-  import CaptureCard from '$lib/components/CaptureCard.svelte';
-  import CaptureModal from '$lib/components/CaptureModal.svelte';
-  import type { Capture, CaptureType } from '$lib/db';
-  import BulkActionBar from '$lib/components/BulkActionBar.svelte';
+  import { activeCaptures } from '$lib/stores/captures';
   import { goto } from '$app/navigation';
-  import { registerShortcuts } from '$lib/shortcuts';
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { requestProFeature } from '$lib/pro';
+  import CaptureBrowser from '$lib/components/CaptureBrowser.svelte';
 
   let collection = $derived($collections.find(c => c.id === $page.params.id));
   let items = $derived($activeCaptures.filter(c => c.collectionId === $page.params.id));
-  let visibleIds = $derived(items.map(c => c.id));
-
-  onMount(() => {
-    registerShortcuts([
-      { key: 'A', label: 'Select All', description: 'Select all in collection', shift: true, handler: () => selectAll(visibleIds) },
-      { key: 'Escape', label: 'Clear', description: 'Clear selection', ctrlOrCmd: false, handler: () => clearSelection() }
-    ]);
-  });
 
   let isEditing = $state(false);
-  let showModal = $state(false);
-  let editingCapture = $state<Capture | null>(null);
-  let initialModalData = $state<any>(null);
   let editName = $state('');
   let inputEl = $state<HTMLInputElement | null>(null);
 
@@ -71,60 +55,6 @@
       await goto('/');
     }
   }
-
-  async function handleDeleteCapture(id: string) {
-    await softDeleteCapture(id);
-  }
-
-  async function handleArchiveCapture(id: string) {
-    await updateCapture(id, { status: 'archived' });
-  }
-
-  function openEditModal(capture: Capture) {
-    editingCapture = capture;
-    initialModalData = {
-      type: capture.type,
-      title: capture.title,
-      content: capture.content,
-      sourceUrl: capture.sourceUrl ?? '',
-      collectionId: capture.collectionId ?? null,
-      tags: [...capture.tags],
-      id: capture.id,
-      ocrText: capture.ocrText,
-      ocrStatus: capture.ocrStatus
-    };
-    showModal = true;
-  }
-
-  async function handleCardOpen(capture: Capture) {
-    if (capture.type === 'link') {
-      const allowed = await requestProFeature('readingView', 'Reading View');
-      if (!allowed) return;
-      void goto(`/read/${capture.id}`);
-      return;
-    }
-    openEditModal(capture);
-  }
-
-  async function handleSave(data: any) {
-    if (editingCapture) {
-      await updateCapture(editingCapture.id, {
-        type: data.type,
-        title: data.title,
-        content: data.content,
-        tags: data.tags,
-        sourceUrl: data.sourceUrl || null,
-        collectionId: data.collectionId ?? null,
-        ocrText: data.ocrText,
-        ocrStatus: data.ocrStatus
-      });
-      editingCapture = null;
-      initialModalData = null;
-      return;
-    }
-
-    await addCapture(data as CreateCaptureInput);
-  }
 </script>
 
 <svelte:head>
@@ -133,7 +63,7 @@
 
 <div class="page fade-in">
   {#if collection}
-    <div class="page-header">
+    <div class="custom-collection-header">
       <div class="header-left">
         <span class="collection-dot" style="background: {collection.color}"></span>
         {#if isEditing}
@@ -146,7 +76,8 @@
             maxlength="30"
           />
         {:else}
-          <h1 class="page-title">
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_to_interactive_role -->
+          <h1 class="page-title" onclick={startEditing} role="button" tabindex="0">
             {collection.name}
           </h1>
         {/if}
@@ -159,25 +90,19 @@
       </div>
     </div>
 
-    {#if items.length > 0}
-      <div class="capture-grid">
-        {#each items as capture (capture.id)}
-          <CaptureCard 
-            {capture} 
-            onDelete={handleDeleteCapture} 
-            onArchive={handleArchiveCapture}
-            onEdit={openEditModal}
-            onOpen={handleCardOpen}
-            {visibleIds}
-          />
-        {/each}
-      </div>
-    {:else}
-      <div class="empty-state">
-        <div class="empty-icon">📂</div>
-        <h2 class="empty-title">{t('collections.empty')}</h2>
-      </div>
-    {/if}
+    <!-- CaptureBrowser handles search, sorting, layouts, modals, and list rendering -->
+    <CaptureBrowser
+      captures={$activeCaptures}
+      title=""
+      icon=""
+      emptyTitle={t('collections.empty') || 'This collection is empty'}
+      emptyHint=""
+      newBtnLabel={t('capture.addNew') || 'Add New'}
+      newBtnTab="link"
+      collectionId={collection.id}
+      showTypeFilter={true}
+      showStatusFilter={true}
+    />
   {:else}
     <div class="empty-state">
       <h2 class="empty-title">Collection not found</h2>
@@ -186,12 +111,9 @@
   {/if}
 </div>
 
-<BulkActionBar {visibleIds} />
-<CaptureModal bind:open={showModal} onSave={handleSave} initialData={initialModalData} />
-
 <style>
   .page { max-width: 100%; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; gap: 16px; }
+  .custom-collection-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 16px; }
   .header-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
   
   .collection-dot {
@@ -273,12 +195,6 @@
     background: #fff1f2;
   }
 
-  .capture-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-  }
-
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -288,7 +204,6 @@
     text-align: center;
   }
 
-  .empty-icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.3; }
   .empty-title { font-size: 1.25rem; font-weight: 600; color: var(--color-text-secondary); margin: 0; }
 
   .btn-primary {

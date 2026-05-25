@@ -157,6 +157,26 @@ export async function encryptCapture(c: Capture, key: CryptoKey): Promise<Captur
     encrypted.tags = ['enc_json:' + await encryptText(serializedTags, key)];
   }
 
+  // Encrypt offline reading cache fields
+  if (c.readableHtml) {
+    encrypted.readableHtml = 'enc:' + await encryptText(c.readableHtml, key);
+  }
+  if (c.readableText) {
+    encrypted.readableText = 'enc:' + await encryptText(c.readableText, key);
+  }
+  if (c.readableTitle) {
+    encrypted.readableTitle = 'enc:' + await encryptText(c.readableTitle, key);
+  }
+  if (c.readableByline) {
+    encrypted.readableByline = 'enc:' + await encryptText(c.readableByline, key);
+  }
+  if (c.readableSiteName) {
+    encrypted.readableSiteName = 'enc:' + await encryptText(c.readableSiteName, key);
+  }
+  if (c.archiveError) {
+    encrypted.archiveError = 'enc:' + await encryptText(c.archiveError, key);
+  }
+
   return encrypted;
 }
 
@@ -175,6 +195,26 @@ export async function decryptCapture(c: Capture, key: CryptoKey): Promise<Captur
   if (c.tags && c.tags.length === 1 && c.tags[0].startsWith('enc_json:')) {
     const jsonStr = await decryptText(c.tags[0].slice(9), key);
     decrypted.tags = JSON.parse(jsonStr);
+  }
+
+  // Decrypt offline reading cache fields
+  if (c.readableHtml && c.readableHtml.startsWith('enc:')) {
+    decrypted.readableHtml = await decryptText(c.readableHtml.slice(4), key);
+  }
+  if (c.readableText && c.readableText.startsWith('enc:')) {
+    decrypted.readableText = await decryptText(c.readableText.slice(4), key);
+  }
+  if (c.readableTitle && c.readableTitle.startsWith('enc:')) {
+    decrypted.readableTitle = await decryptText(c.readableTitle.slice(4), key);
+  }
+  if (c.readableByline && c.readableByline.startsWith('enc:')) {
+    decrypted.readableByline = await decryptText(c.readableByline.slice(4), key);
+  }
+  if (c.readableSiteName && c.readableSiteName.startsWith('enc:')) {
+    decrypted.readableSiteName = await decryptText(c.readableSiteName.slice(4), key);
+  }
+  if (c.archiveError && c.archiveError.startsWith('enc:')) {
+    decrypted.archiveError = await decryptText(c.archiveError.slice(4), key);
   }
 
   return decrypted;

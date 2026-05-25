@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
   import type { Capture } from '$lib/db';
   import {
@@ -10,7 +11,7 @@
     enterSelectionMode
   } from '$lib/stores/selection';
   import { collections } from '$lib/stores/collections';
-  import { updateCapture, runOcrOnCapture } from '$lib/stores/captures';
+  import { updateCapture, runOcrOnCapture, archiveArticleForCapture } from '$lib/stores/captures';
   import { activeOcrRuns } from '$lib/ocr';
   import { requestProFeature } from '$lib/pro';
   import { formatReminderDate } from '$lib/reminders';
@@ -190,6 +191,19 @@
       longPressTimer = null;
     }
   }
+
+  onMount(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (showMenu) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.ctx-menu') && !target.closest('.menu-btn')) {
+          closeMenu();
+        }
+      }
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -198,6 +212,7 @@
   class:trashed={capture.isTrashed}
   class:selected={isSelected}
   class:selection-mode={isSelectionMode}
+  class:menu-open={showMenu}
   role="button"
   tabindex="0"
   onclick={handleCardClick}
@@ -271,6 +286,20 @@
         {/if}
         <p class="card-link">{truncate(capture.content, 72)}</p>
       </div>
+
+      {#if capture.archiveStatus === 'pending'}
+        <div class="ocr-running-indicator" onclick={(e) => e.stopPropagation()}>
+          <span class="pulse-dot"></span>
+          <span>Archiving for offline...</span>
+        </div>
+      {:else if capture.archiveStatus === 'failed'}
+        <div class="ocr-failed-row" onclick={(e) => e.stopPropagation()}>
+          <span class="ocr-failed-text">⚠ Offline archive failed</span>
+          <button class="ocr-retry-btn" onclick={async (e) => { e.stopPropagation(); const allowed = await requestProFeature('readingView', 'Reading View'); if (allowed) void archiveArticleForCapture(capture.id, capture.content); }}>
+            Retry
+          </button>
+        </div>
+      {/if}
     {:else}
       <p class="card-preview">{truncate(getPreview(), 200)}</p>
     {/if}
@@ -377,6 +406,10 @@
                 border-color var(--duration-normal) var(--ease-out), 
                 box-shadow var(--duration-normal) var(--ease-out), 
                 background var(--duration-normal) var(--ease-out);
+  }
+
+  .card.menu-open {
+    z-index: 50;
   }
 
   .card:hover {

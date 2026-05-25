@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
   import { CHECKOUT_URLS, getCheckoutUrl } from '$lib/constants';
-  import { settings, setAutoLockMinutes, setAutoOcr, setAutoFetchMetadata } from '$lib/stores/settings';
+  import { settings, setAutoLockMinutes, setAutoOcr, setAutoFetchMetadata, setAutoArchiveArticles, setArchiveSizeLimit } from '$lib/stores/settings';
   import { db } from '$lib/db';
   import { runOcrOnCapture } from '$lib/stores/captures';
   import { themeMode, setTheme, type ThemeMode } from '$lib/theme';
@@ -29,7 +29,7 @@
     createVerification,
     checkVerification
   } from '$lib/encryption';
-  import { loadCaptures, captures } from '$lib/stores/captures';
+  import { loadCaptures, captures, getArticleCacheSize, clearArticleCache } from '$lib/stores/captures';
   import {
     modelLoadingState,
     downloadProgress,
@@ -44,6 +44,30 @@
   import { get } from 'svelte/store';
 
   let storageInfo = $state<StorageEstimate | null>(null);
+  let articleCacheSize = $state(0);
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.log(bytes) <= 0 ? 0 : Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  async function handleClearArticleCache() {
+    const confirmClear = confirm("Are you sure you want to clear your offline article cache? Your saved links will be preserved, but their cached offline content will be removed. They will be re-downloaded when opened.");
+    if (!confirmClear) return;
+
+    try {
+      await clearArticleCache();
+      articleCacheSize = await getArticleCacheSize();
+      storageInfo = await getStorageEstimate();
+      showToast('✓ Offline article cache cleared');
+    } catch (err) {
+      console.error('Failed to clear article cache:', err);
+      showToast('Failed to clear article cache');
+    }
+  }
   let licenseKey = $state('');
   let licenseError = $state('');
   let licenseSuccess = $state(false);
@@ -325,6 +349,7 @@
     initInstallPrompt({ countVisit: false });
     storageInfo = await getStorageEstimate();
     await countSkippedImages();
+    articleCacheSize = await getArticleCacheSize();
   });
 
   async function handleThemeChange(mode: ThemeMode) {
@@ -660,6 +685,47 @@
         </label>
       </div>
 
+      <div class="setting-divider"></div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Auto-archive articles for offline reading</span>
+          <p class="setting-hint">Downloads and caches a clean, readable copy of articles locally when saved.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked={$settings.autoArchiveArticles} onchange={async (e) => {
+            const enabled = (e.target as HTMLInputElement).checked;
+            if (enabled) {
+              const allowed = await requestProFeature('readingView', 'Reading View');
+              if (!allowed) {
+                (e.target as HTMLInputElement).checked = false;
+                return;
+              }
+            }
+            await setAutoArchiveArticles(enabled);
+          }} />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-divider"></div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Article cache size limit</span>
+          <p class="setting-hint">Caps the total local storage occupied by cached offline articles.</p>
+        </div>
+        <select class="select" value={$settings.archiveSizeLimit} onchange={async (e) => {
+          const limit = (e.target as HTMLSelectElement).value as any;
+          await setArchiveSizeLimit(limit);
+        }}>
+          <option value="unlimited">Unlimited</option>
+          <option value="50mb">50 MB</option>
+          <option value="100mb">100 MB</option>
+          <option value="250mb">250 MB</option>
+        </select>
+      </div>
+
       {#if skippedImagesCount > 0}
         <div class="setting-divider"></div>
         <div class="setting-row">
@@ -763,6 +829,18 @@
       {:else}
         <p class="skeleton" style="height:40px; width:100%;">&nbsp;</p>
       {/if}
+
+      <div class="setting-divider"></div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Offline article cache size</span>
+          <p class="setting-hint">Currently occupying {formatBytes(articleCacheSize)} of IndexedDB storage.</p>
+        </div>
+        <button class="btn-outline danger-outline" onclick={handleClearArticleCache} disabled={articleCacheSize === 0}>
+          Clear article cache
+        </button>
+      </div>
     </div>
   </section>
 
@@ -799,12 +877,12 @@
 
       <div class="setting-row">
         <div class="setting-info">
-          <span class="setting-label">{t('settings.importData') || 'Import Backup'}</span>
-          <p class="setting-hint">Restore data from a Motif ZIP file</p>
+          <span class="setting-label">Import Backup or Pocket Export</span>
+          <p class="setting-hint">Restore data from a Motif ZIP backup or import a Pocket HTML file</p>
         </div>
-        <input type="file" accept=".zip" bind:this={fileInput} onchange={handleFileSelect} hidden />
+        <input type="file" accept=".zip,.html,.htm" bind:this={fileInput} onchange={handleFileSelect} hidden />
         <button class="btn-outline" onclick={openImportPicker}>
-          Import ZIP
+          Choose File
         </button>
       </div>
 
