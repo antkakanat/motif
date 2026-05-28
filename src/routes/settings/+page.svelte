@@ -932,6 +932,8 @@
     <div class="section-card">
       <p class="privacy-statement">{t('settings.privacyStatement')}</p>
       <div class="privacy-links">
+        <a href="https://byant.dev/" target="_blank" rel="noopener">byant.dev</a>
+        <span class="separator">|</span>
         <a href="https://byant.dev/motif/privacy" target="_blank" rel="noopener">{t('settings.privacyLink')}</a>
         <span class="separator">|</span>
         <a href="https://byant.dev/motif/terms" target="_blank" rel="noopener">{t('settings.termsLink')}</a>

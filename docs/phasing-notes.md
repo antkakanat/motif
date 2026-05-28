@@ -280,3 +280,14 @@
 - Ran full `npm run check` verification with `0 errors and 15 warnings` (fully clean Type-safe Svelte compiler status).
 - Verified production build completes all bundle creation steps cleanly.
 
+## Addendum (2026-05, Developer Backlink & SEO Optimization)
+- **Developer Backlink Addition**:
+  - Inserted a semantic, crawler-friendly anchor link pointing directly to the root domain `https://byant.dev/` (`<a href="https://byant.dev/" target="_blank" rel="noopener">byant.dev</a>`) inside the Privacy/Footer card of the Settings page (`src/routes/settings/+page.svelte`).
+  - This guarantees that once web crawlers discover and index the app deployed at subdomains (such as `tono.byant.dev` or `motif.byant.dev`), they have a natural backlink path to discover and pass link equity back to the main developer site at `byant.dev`.
+- **Dynamic SEO Canonical Tags**:
+  - Replaced the static, hardcoded canonical tag `<link rel="canonical" href="https://motif.byant.dev/" />` in layout files with SvelteKit's reactive page store `$page.url.origin + $page.url.pathname`.
+  - Removed the static canonical link placeholder in `src/app.html` to avoid duplicate tag injections, ensuring a single dynamic canonical tag exists for every visited route.
+  - This allows multiple subdomains (including `tono.byant.dev`) to index perfectly with absolute, matching canonical URLs, eliminating duplicate content indexing issues.
+- **Verification**:
+  - Executed `npm run check` which returned 0 errors and 15 warnings (harmless accessibility and CSS vendor prefix warning checkouts), ensuring zero compilation regressions.
+
