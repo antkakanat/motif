@@ -389,6 +389,7 @@
     <button class="btn btn-primary cta-btn-footer" onclick={onEnterDashboard}>
       Start Capturing with Motif
     </button>
+    <a href="https://byant.dev/motif" class="learn-more-link" target="_blank" rel="noopener">Learn more about Motif</a>
   </footer>
 </div>
 
@@ -1169,5 +1170,23 @@
       padding: 4px 10px;
       font-size: 0.72rem;
     }
+  }
+
+  .learn-more-link {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all var(--duration-fast) var(--ease-out);
+    opacity: 0.85;
+    display: inline-block;
+  }
+
+  .learn-more-link:hover {
+    opacity: 1;
+    color: var(--color-accent);
+    text-shadow: 0 0 8px rgba(13, 148, 136, 0.4);
+    transform: translateY(-1px);
   }
 </style>

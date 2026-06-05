@@ -41,6 +41,46 @@
   let swRegistration = $state<ServiceWorkerRegistration | undefined>(undefined);
   let forceFreeMode = $derived(isForceFreeMode());
 
+  // SEO variables
+  const noindexRoutes = [
+    '/links',
+    '/quotes',
+    '/notes',
+    '/images',
+    '/archived',
+    '/trash',
+    '/reminders',
+    '/settings',
+    '/lock'
+  ];
+
+  const isNoindexRoute = $derived.by(() => {
+    const path = $page.url.pathname;
+    return noindexRoutes.includes(path) || path.startsWith('/read/');
+  });
+
+  const canonicalUrl = $derived.by(() => {
+    if ($page.url.pathname === '/') {
+      return 'https://motif.byant.dev/';
+    }
+    return 'https://motif.byant.dev' + $page.url.pathname;
+  });
+
+  const pageTitle = $derived.by(() => {
+    if ($page.url.pathname === '/') {
+      return 'Motif - Capture every note, link, and quote privately.';
+    }
+    return 'Motif - Capture every note.';
+  });
+
+  const pageDescription = $derived.by(() => {
+    if ($page.url.pathname === '/') {
+      return 'No cloud. No subscription. No tracking. Just your private links, quotes, notes, and images - 100% offline and secured with AES-256 local database encryption.';
+    }
+    return 'No cloud. No subscription. No noise. Just your links, quotes, notes, and images - private, offline, and always yours.';
+  });
+
+
   // Auto-lock idle timer
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -179,14 +219,17 @@
 </script>
 
 <svelte:head>
-  <title>Motif - Capture every note.</title>
-  <meta name="description" content="No cloud. No subscription. No noise. Just your links, quotes, notes, and images - private, offline, and always yours." />
+  {#if isNoindexRoute}
+    <meta name="robots" content="noindex, follow" />
+  {/if}
+  <title>{pageTitle}</title>
+  <meta name="description" content={pageDescription} />
   <meta name="theme-color" content="#5B4ED6" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="canonical" href={$page.url.origin + $page.url.pathname} />
+  <link rel="canonical" href={canonicalUrl} />
   {@html pwaInfo ? pwaInfo.webManifest.linkTag : ''}
   <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
 </svelte:head>

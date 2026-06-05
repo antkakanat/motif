@@ -1,21 +1,4 @@
-# Allow crawling of the public landing page and static assets
 User-agent: *
-Allow: /$
-Allow: /static/
-Allow: /screenshots/
-Allow: /favicon.ico
-Allow: /logo-light.png
-Allow: /logo-dark.png
+Allow: /
 
-# Disallow crawling of private client-side dashboard routes and API endpoints
-Disallow: /links
-Disallow: /quotes
-Disallow: /notes
-Disallow: /images
-Disallow: /archived
-Disallow: /trash
-Disallow: /reminders
-Disallow: /settings
-Disallow: /lock
-Disallow: /read/
-Disallow: /api/
+Sitemap: https://motif.byant.dev/sitemap.xml
